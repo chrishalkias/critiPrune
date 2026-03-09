@@ -1,14 +1,14 @@
 # Neural Network Pruning as a Phase Transition
 
-> *Discovering that structured pruning of neural networks — from tiny FC networks to multi-million-parameter LLMs — obeys a universal sigmoid law with a sharp critical threshold, analogous to a second-order phase transition in statistical mechanics.*
+> *Discovering that structured pruning of neural networks, from tiny FC networks to multi-million-parameter LLMs, obeys a universal sigmoid law with a sharp critical threshold, analogous to a second-order phase transition in statistical mechanics.*
 
 ---
 
 ## Overview
 
-This repository investigates the hypothesis that **neural network pruning is a phase transition**, drawing on the Feynman path integral formalism from quantum field theory.
+This repository investigates the hypothesis that **neural network pruning is a phase transition**, drawing on quantum field theory and statistical physics.
 
-When you progressively restore active neurons (paths) to a pruned network, performance does not recover gradually — it undergoes a sharp, sigmoidal transition at a critical threshold K₀. This behaviour mirrors the order-parameter jump at a second-order phase transition, and the parameters of the sigmoid curve (`K₀`, `β`, `g_eff`) obey precise **scaling laws** across network architecture.
+When you progressively restore active neurons (paths) to a pruned network, performance does not recover gradually, it undergoes a sharp, sigmoidal transition at a critical threshold K₀. This behaviour mirrors the order-parameter jump at a second-order phase transition, and the parameters of the sigmoid curve (`K₀`, `β`, `g_eff`) obey precise **scaling laws** across network architecture.
 
 The framework is validated on:
 - Fully-connected ReLU networks trained on **MNIST / sklearn Digits** and **CIFAR-10**
@@ -19,15 +19,14 @@ The framework is validated on:
 
 ## Core Idea
 
-For a given network, define K as the number of active neurons (or paths) allowed per layer after pruning. The performance recovery curve is fit to a **logistic sigmoid**:
+For a given network, define K as the sparsity ratio of the prunned network. The performance recovery curve is fit to a **logistic sigmoid**:
 
 $$A(K) = A_0 + \frac{A_\infty - A_0}{1 + e^{-\beta(K - K_0)}}$$
 
 | Parameter | Meaning |
 |---|---|
-| **K₀** | Critical path threshold — the "phase transition point" |
+| **K₀** | Critical sparsity threshold — the "phase transition point" |
 | **β** | Inverse correlation length / steepness of the transition |
-| **g_eff = e⁻ᵝ** | Effective coupling constant — how "redundant" the network is |
 | **A₀** | Accuracy at full pruning (chance level) |
 | **A∞** | Accuracy at full network (unpruned) |
 
@@ -111,7 +110,7 @@ Applies the same framework to **transformer MLP layers** across the full Pythia 
 1. Collect MLP activation statistics over 128 C4 calibration samples
 2. Compute per-neuron WANDA scores (combined up-projection and down-projection signals)
 3. Sweep K = fraction of `d_ff` neurons kept (1% → 100%), measuring **perplexity recovery** on WikiText-2
-4. Fit the sigmoid and extract `(K₀, β, g_eff)`
+4. Fit the sigmoid and extract `(K₀, β)`
 5. Fit joint power-law scaling across the model family: `K₀ ~ d_ff^α × L^γ`
 
 Designed to run on **Google Colab T4** for models up to 2.8B; an A100 is needed for 6.9B.
@@ -134,9 +133,8 @@ The main empirical finding is that sigmoid parameters scale as **power laws** in
 
 $$K_0 \approx a \cdot H^\alpha \cdot L^\gamma$$
 $$\beta \approx a \cdot H^\alpha \cdot L^\gamma$$
-$$g_{\text{eff}} \approx a \cdot H^\alpha \cdot L^\gamma$$
 
-where H is hidden width and L is depth. The ratio `K₀/H` is approximately constant across widths at fixed depth, meaning **a fixed fraction of neurons are always critical** — a strong universality result.
+where H is hidden width and L is depth.
 
 ---
 
