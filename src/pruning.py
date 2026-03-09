@@ -658,7 +658,7 @@ if __name__ == '__main__':
     HIDDEN_SIZE  = 64
     NUM_LAYERS   = 5
     EPOCHS       = 300
-    OUTPUT       = './pruning_coupling/mnist_figures'
+    OUTPUT       = 'mnist_figures'
 
     np.random.seed(SEED)
     os.makedirs(OUTPUT, exist_ok=True)
@@ -721,8 +721,7 @@ if __name__ == '__main__':
     print(f"  Plot saved → {plot_path}")
 
     # 7. Save data
-    os.makedirs('pruning_coupling', exist_ok=True)
-    with open('pruning_coupling/accuracies_all_methods.txt', 'w') as f:
+    with open('mnist_figures/accuracies_all_methods.txt', 'w') as f:
         for m in PRUNING_METHODS:
             acc_fmt = {int(k): round(float(all_accs[m][k]), 4) for k in k_values}
             f.write(f"# {PRUNING_METHODS[m]}\nacc_{m} = {acc_fmt}\n\n")
