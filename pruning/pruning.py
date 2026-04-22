@@ -111,7 +111,7 @@ class FCNetwork(nn.Module):
         layers = []
         sizes = [input_size] + [hidden_size] * num_hidden_layers + [num_classes]
         for fan_in, fan_out in zip(sizes[:-1], sizes[1:]):
-            layer = nn.Linear(fan_in, fan_out, dtype=torch.float64)
+            layer = nn.Linear(fan_in, fan_out, dtype=torch.float32)
             nn.init.kaiming_normal_(layer.weight, nonlinearity='relu')
             nn.init.zeros_(layer.bias)
             layers.append(layer)
@@ -134,7 +134,7 @@ class FCNetwork(nn.Module):
         relu_masks = []
         for layer in self.layers[:-1]:
             z = layer(x)
-            mask = (z > 0).to(torch.float64)
+            mask = (z > 0).to(z.dtype)
             x = z * mask
             relu_masks.append(mask)
         return self.layers[-1](x), relu_masks
@@ -162,21 +162,22 @@ class FCNetwork(nn.Module):
 
         Parameters
         ----------
-        X_tr, X_val : ndarray [N, D] – training / validation features
-        y_tr, y_val : ndarray [N]    – integer class labels
+        X_tr, X_val : ndarray [N, D] - training / validation features
+        y_tr, y_val : ndarray [N]    - integer class labels
         epochs      : int
-        bs          : int            – mini-batch size
-        lr          : float          – learning rate
+        bs          : int            - mini-batch size
+        lr          : float          - learning rate
         verbose     : bool
 
         Returns
         -------
-        float – final validation accuracy
+        float - final validation accuracy
         """
-        device = next(self.parameters()).device
-        X_tr_t = torch.as_tensor(X_tr, dtype=torch.float64, device=device)
+        p = next(self.parameters())
+        device, dtype = p.device, p.dtype
+        X_tr_t = torch.as_tensor(X_tr, dtype=dtype, device=device)
         y_tr_t = torch.as_tensor(y_tr, dtype=torch.long, device=device)
-        X_val_t = torch.as_tensor(X_val, dtype=torch.float64, device=device)
+        X_val_t = torch.as_tensor(X_val, dtype=dtype, device=device)
         y_val_t = torch.as_tensor(y_val, dtype=torch.long, device=device)
 
         optimizer = optim.Adam(self.parameters(), lr=lr)
@@ -242,7 +243,7 @@ class FCNetwork(nn.Module):
         relu_masks = []
         for l in range(self.L):
             z = h @ W[l].T + b[l]
-            mask = (z > 0).astype(np.float64)
+            mask = (z > 0).astype(z.dtype)
             h = z * mask
             relu_masks.append(mask)
         return h @ W[-1].T + b[-1], relu_masks
@@ -414,12 +415,12 @@ def _trace_paths_batch(model_W, model_L, model_H,
 
     Parameters
     ----------
-    model_W          : list of ndarray – weight matrices
-    model_L          : int – number of hidden layers
-    model_H          : int – hidden size
+    model_W          : list of ndarray - weight matrices
+    model_L          : int - number of hidden layers
+    model_H          : int - hidden size
     X_batch          : [B, I]
     relu_masks_batch : list of [B, H] (one per hidden layer)
-    K                : int – beam width
+    K                : int - beam width
     col_masks_K      : list of bool[H] or None (static method column masks)
     is_static        : bool
 
@@ -477,7 +478,7 @@ def evaluate_path_accuracy(model, X_test, y_test, k_values,
     k_values     : list of int
     layer_scores : list of ndarray or None per layer
     method_name  : str
-    max_mem_mb   : int – memory budget for batched path-tracing
+    max_mem_mb   : int - memory budget for batched path-tracing
 
     Returns
     -------

@@ -31,9 +31,10 @@ import warnings
 import numpy as np
 import torch
 from scipy.optimize import curve_fit
+import torch.nn as nn
+import torchvision.transforms as T
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -51,15 +52,76 @@ from pruning import (
 
 SEED = 42
 OUTPUT_DIR = 'cifar_figures'
-PCA_DIM = 200       # reduce CIFAR from 3072 -> 200 for tractable FC
-EPOCHS = 500
-LR = 1e-3
-BS = 128
+BACKBONE          = 'resnet18'
+FEATURE_DIM       = 512   # ResNet18 avgpool output dim
+FEATURE_CACHE_DIR = os.environ.get('FEATURE_CACHE_DIR', '/tmp/cifar_features')
+EPOCHS     = 300          # ResNet features converge faster than PCA
+LR         = 1e-3
+BS         = 128
+N_K_POINTS = 60           # max K values sampled per architecture
 
-H_VALUES = [32, 64, 128, 256]
+H_VALUES = [64, 128, 256, 512]
 L_VALUES = [2, 3, 5, 7, 10]
 
-MAX_MEM_MB = 256
+MAX_MEM_MB = 512
+
+
+# --- ResNet18 feature extractor -----------------------------------------------
+
+def extract_cnn_features(X_hwc, split_name):
+    """Extract frozen pretrained ResNet18 features from raw HWC uint8 images.
+
+    Caches to FEATURE_CACHE_DIR so re-runs skip extraction entirely.
+
+    Parameters
+    ----------
+    X_hwc      : ndarray [N, H, W, C] uint8
+    split_name : str  e.g. 'train', 'val', 'test'
+
+    Returns
+    -------
+    feats : ndarray [N, 512] float32
+    """
+    import torchvision.models as models
+
+    cache_path = os.path.join(FEATURE_CACHE_DIR, f'{BACKBONE}_{split_name}.npy')
+    if os.path.exists(cache_path):
+        feats = np.load(cache_path)
+        print(f"  Loaded cached {split_name} features: {feats.shape}")
+        return feats
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    net = models.resnet18(weights='IMAGENET1K_V1')
+    net.fc = nn.Identity()
+    net = net.to(device).eval()
+
+    transform = T.Compose([
+        T.Resize(224, antialias=True),
+        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+
+    # HWC uint8 → CHW float [0, 1]
+    X_tensor = torch.from_numpy(X_hwc.transpose(0, 3, 1, 2)).float() / 255.0
+
+    chunks = []
+    with torch.no_grad():
+        for i in range(0, len(X_tensor), 256):
+            batch = transform(X_tensor[i:i + 256].to(device))
+            chunks.append(net(batch).cpu().numpy())
+
+    feats = np.concatenate(chunks, axis=0)
+    os.makedirs(FEATURE_CACHE_DIR, exist_ok=True)
+    np.save(cache_path, feats)
+    print(f"  Extracted & cached {split_name} features: {feats.shape}")
+    return feats
+
+
+def make_k_values(H):
+    """Evenly-spaced K sample points in [1, H], capped at N_K_POINTS."""
+    if H <= N_K_POINTS:
+        return list(range(1, H + 1))
+    pts = np.unique(np.round(np.linspace(1, H, N_K_POINTS)).astype(int))
+    return sorted(set([1] + pts.tolist() + [H]))
 
 
 # --- CIFAR-10 loading ---------------------------------------------------------
@@ -114,11 +176,11 @@ def _load_cifar10_raw():
 
 
 def load_cifar10():
-    """Load CIFAR-10, flatten, PCA-reduce, and standardise.
+    """Load CIFAR-10, extract ResNet18 features, standardise.
 
     Returns
     -------
-    X_tr, X_val, X_te : ndarray [N, PCA_DIM]
+    X_tr, X_val, X_te : ndarray [N, FEATURE_DIM]  float64
     y_tr, y_val, y_te : ndarray [N]
     """
     X_tr_raw = None
@@ -136,33 +198,29 @@ def load_cifar10():
             "Cannot load CIFAR-10.  Install torchvision or ensure"
             " internet access for raw download.")
 
-    X_tr_flat = X_tr_raw.reshape(X_tr_raw.shape[0], -1).astype(np.float64)
-    X_te_flat = X_te_raw.reshape(X_te_raw.shape[0], -1).astype(np.float64)
-
-    X_tr, X_val, y_tr, y_val = train_test_split(
-        X_tr_flat, y_tr_raw, test_size=0.10,
+    # Train/val split on raw HWC data
+    X_tr_raw, X_val_raw, y_tr, y_val = train_test_split(
+        X_tr_raw, y_tr_raw, test_size=0.10,
         random_state=SEED, stratify=y_tr_raw)
-    X_te = X_te_flat
-    y_te = y_te_raw
 
-    # Subsample test set for speed
+    # Subsample test set for evaluation speed
     rng = np.random.default_rng(SEED)
-    te_idx = rng.choice(len(y_te), size=min(1500, len(y_te)), replace=False)
-    X_te, y_te = X_te[te_idx], y_te[te_idx]
+    te_idx = rng.choice(len(y_te_raw), size=min(1500, len(y_te_raw)), replace=False)
+    X_te_raw, y_te = X_te_raw[te_idx], y_te_raw[te_idx]
 
+    # Extract frozen ResNet18 features (cached to disk)
+    X_tr  = extract_cnn_features(X_tr_raw,  'train').astype(np.float64)
+    X_val = extract_cnn_features(X_val_raw, 'val').astype(np.float64)
+    X_te  = extract_cnn_features(X_te_raw,  'test').astype(np.float64)
+
+    # Standardise the 512-dim embedding space
     sc = StandardScaler()
-    X_tr = sc.fit_transform(X_tr)
+    X_tr  = sc.fit_transform(X_tr)
     X_val = sc.transform(X_val)
-    X_te = sc.transform(X_te)
+    X_te  = sc.transform(X_te)
 
-    pca = PCA(n_components=PCA_DIM, random_state=SEED)
-    X_tr = pca.fit_transform(X_tr)
-    X_val = pca.transform(X_val)
-    X_te = pca.transform(X_te)
-
-    var_explained = pca.explained_variance_ratio_.sum()
-    print(f"  PCA: 3072 -> {PCA_DIM}  ({100 * var_explained:.1f}% variance retained)")
-    print(f"  Train: {X_tr.shape[0]}  Val: {X_val.shape[0]}  Test: {X_te.shape[0]}")
+    print(f"  {BACKBONE} → {FEATURE_DIM}-dim features | "
+          f"Train: {X_tr.shape[0]}  Val: {X_val.shape[0]}  Test: {X_te.shape[0]}")
     return X_tr, X_val, X_te, y_tr, y_val, y_te
 
 
@@ -181,7 +239,7 @@ def run_cifar_scaling_scan(X_tr, X_val, X_te, y_tr, y_val, y_te):
             t0 = time.time()
             print(f"\n  [{count}/{total}] H={H}, L={L}", end="", flush=True)
 
-            model = FCNetwork(input_size=PCA_DIM, hidden_size=H,
+            model = FCNetwork(input_size=FEATURE_DIM, hidden_size=H,
                               num_hidden_layers=L, num_classes=10, seed=SEED)
             val_acc = model.train_model(X_tr, y_tr, X_val, y_val,
                                         epochs=EPOCHS, bs=BS, lr=LR,
@@ -195,7 +253,7 @@ def run_cifar_scaling_scan(X_tr, X_val, X_te, y_tr, y_val, y_te):
             scores = precompute_pruning_scores(
                 model, X_tr, y_tr, methods=['wanda'], seed=SEED)
 
-            k_values = list(range(1, H + 1))
+            k_values = make_k_values(H)
             accs, normal_acc = evaluate_path_accuracy(
                 model, X_te, y_te, k_values,
                 scores['wanda'], method_name='wanda',
@@ -343,80 +401,83 @@ def fit_scaling_laws(results, r2_threshold=0.80):
 # --- Visualisation ------------------------------------------------------------
 
 def make_plots(results, scaling, output_dir):
-    """Produce three figures mirroring the MNIST output for CIFAR-10 / WANDA."""
+    """Produce two figures for CIFAR-10 / WANDA.
+
+    Figure 1 (cifar_scaling_curves.png):
+        Top row  — accuracy curves per L slice with sigmoid fits.
+        Bottom   — K_0 vs H scatter with connecting lines per L.
+
+    Figure 2 (cifar_k0_scaling.png):
+        Left  — K_0 vs H with connecting lines + power-law fit overlay.
+        Right — K_0 heatmap over the (H, L) grid.
+    """
     good = [r for r in results
             if r.get('sigmoid_R2') is not None and r['sigmoid_R2'] > 0.80]
     if len(good) < 3:
         print("  Not enough data for plots")
         return []
 
-    H_arr = np.array([r['H'] for r in good], dtype=float)
-    L_arr = np.array([r['L'] for r in good], dtype=float)
+    H_arr  = np.array([r['H'] for r in good], dtype=float)
+    L_arr  = np.array([r['L'] for r in good], dtype=float)
     K0_arr = np.array([r['sigmoid_K_0'] for r in good])
-    beta_arr = np.array([r['sigmoid_beta'] for r in good])
-    g_arr = np.array([r['sigmoid_g_eff'] for r in good])
 
     unique_L = sorted(set(int(r['L']) for r in good))
     unique_H = sorted(set(int(r['H']) for r in good))
     cmap_L = plt.cm.viridis(np.linspace(0.15, 0.85, max(len(unique_L), 1)))
-    cmap_H = plt.cm.plasma(np.linspace(0.15, 0.85, max(len(unique_H), 1)))
-    L_col = dict(zip(unique_L, cmap_L))
-    H_col = dict(zip(unique_H, cmap_H))
+    cmap_H = plt.cm.plasma( np.linspace(0.15, 0.85, max(len(unique_H), 1)))
+    L_col  = dict(zip(unique_L, cmap_L))
+    H_col  = dict(zip(unique_H, cmap_H))
 
     paths = []
 
-    # Figure 1: Accuracy curves by architecture
+    # ----------------------------------------------------------------
+    # Figure 1: Accuracy curves (top) + K_0 vs H with lines (bottom)
+    # ----------------------------------------------------------------
     n_L_panels = min(len(unique_L), 5)
-    fig, axes = plt.subplots(2, max(n_L_panels, 3),
-                             figsize=(6 * max(n_L_panels, 3), 11))
-    if axes.ndim == 1:
-        axes = axes.reshape(1, -1)
-    fig.suptitle('CIFAR-10 / WANDA Pruning — Accuracy Curves by Architecture\n'
+    n_cols = max(n_L_panels, 1)
+    fig = plt.figure(figsize=(6 * n_cols, 11))
+    # Top row: one axis per L slice
+    top_axes = [fig.add_subplot(2, n_cols, i + 1) for i in range(n_L_panels)]
+    # Bottom: single wide axis spanning all columns
+    ax_k0 = fig.add_subplot(2, 1, 2)
+
+    fig.suptitle('CIFAR-10 / WANDA Pruning — Accuracy Curves & $K_0$ Scaling\n'
                  '$A(K) = A_0 + (A_\\infty - A_0)/(1 + e^{-\\beta(K-K_0)})$',
                  fontsize=13, y=1.02)
 
     for idx, Lv in enumerate(unique_L[:n_L_panels]):
-        ax = axes[0, idx]
-        subset = sorted([r for r in good if r['L'] == Lv],
-                        key=lambda r: r['H'])
+        ax = top_axes[idx]
+        subset = sorted([r for r in good if r['L'] == Lv], key=lambda r: r['H'])
         for r in subset:
-            ks = sorted(r['accs'].keys())
-            accs = [r['accs'][k] * 100 for k in ks]
+            ks     = sorted(r['accs'].keys())
+            accs_v = [r['accs'][k] * 100 for k in ks]
             k_fine = np.linspace(1, max(ks), 300)
-            ax.scatter(ks, accs, s=12, color=H_col[r['H']], alpha=0.7)
+            ax.scatter(ks, accs_v, s=12, color=H_col[r['H']], alpha=0.7)
             if r.get('sigmoid_R2') and r['sigmoid_R2'] > 0.80:
                 fit = sigmoid_fn(k_fine, r['sigmoid_A_inf'], r['sigmoid_A_0'],
                                  r['sigmoid_K_0'], r['sigmoid_beta']) * 100
                 ax.plot(k_fine, fit, color=H_col[r['H']], lw=1.5,
-                        label=f'H={r["H"]} (g={r["sigmoid_g_eff"]:.2f})')
+                        label=f'H={r["H"]}  K₀={r["sigmoid_K_0"]:.1f}')
         ax.set_title(f'L = {Lv} layers', fontsize=11)
         ax.set_xlabel('K (paths per feature)')
         ax.set_ylabel('Accuracy (%)')
         ax.legend(fontsize=7, loc='lower right')
         ax.grid(alpha=0.3)
-    for idx in range(n_L_panels, axes.shape[1]):
-        axes[0, idx].axis('off')
 
-    for pidx, (arr, ylabel, title) in enumerate([
-        (K0_arr, '$K_0$', '$K_0$ vs Width H'),
-        (beta_arr, '$\\beta$', '$\\beta$ vs Width H'),
-        (g_arr, '$g_{eff} = e^{-\\beta}$', 'Effective Coupling vs Width'),
-    ]):
-        ax = axes[1, pidx]
-        for Lv in unique_L:
-            mask = L_arr == Lv
-            ax.scatter(H_arr[mask], arr[mask], s=80, color=L_col[Lv],
-                       edgecolors='black', lw=0.5, label=f'L={Lv}', zorder=5)
-        if pidx == 2:
-            ax.axhline(1.0, color='red', ls=':', lw=1.5, alpha=0.5,
-                       label='$g=1$')
-        ax.set_xlabel('H (hidden size)')
-        ax.set_ylabel(ylabel)
-        ax.set_title(title)
-        ax.legend(fontsize=7)
-        ax.grid(alpha=0.3)
-    for idx in range(3, axes.shape[1]):
-        axes[1, idx].axis('off')
+    # K_0 vs H with dots connected per L
+    for Lv in unique_L:
+        sub = sorted([r for r in good if r['L'] == Lv], key=lambda r: r['H'])
+        if sub:
+            Hs  = [r['H']           for r in sub]
+            K0s = [r['sigmoid_K_0'] for r in sub]
+            ax_k0.plot(Hs, K0s, 'o-', color=L_col[Lv], lw=1.8, ms=8,
+                       markeredgecolor='black', markeredgewidth=0.5,
+                       label=f'L={Lv}', zorder=5)
+    ax_k0.set_xlabel('H (hidden size)', fontsize=11)
+    ax_k0.set_ylabel('$K_0$ (inflection point)', fontsize=11)
+    ax_k0.set_title('$K_0$ vs Width H', fontsize=12)
+    ax_k0.legend(fontsize=8)
+    ax_k0.grid(alpha=0.3)
 
     plt.tight_layout()
     p = os.path.join(output_dir, 'cifar_scaling_curves.png')
@@ -425,98 +486,67 @@ def make_plots(results, scaling, output_dir):
     paths.append(p)
     print(f"  Saved: {p}")
 
-    # Figure 2: Scaling law summary
-    fig, axes = plt.subplots(1, 3, figsize=(17, 5.5))
-    fig.suptitle('CIFAR-10 — Scaling Laws for Effective Coupling (WANDA)',
-                 fontsize=13, y=1.03)
+    # ----------------------------------------------------------------
+    # Figure 2: K_0 dot plot (with lines + power-law fit) | K_0 heatmap
+    # ----------------------------------------------------------------
+    fig, (ax_dot, ax_heat) = plt.subplots(1, 2, figsize=(14, 6))
+    fig.suptitle('CIFAR-10 / WANDA — $K_0$ Scaling Law', fontsize=13, y=1.02)
 
-    ax = axes[0]
-    ratio = K0_arr / H_arr
+    # Left: K_0 vs H with connecting lines per L + power-law fit overlay
     for Lv in unique_L:
-        mask = L_arr == Lv
-        ax.scatter(H_arr[mask], ratio[mask], s=80, color=L_col[Lv],
-                   edgecolors='black', lw=0.5, label=f'L={Lv}', zorder=5)
-    ax.axhline(ratio.mean(), color='gray', ls='--', lw=1.5, alpha=0.6,
-               label=f'mean={ratio.mean():.2f}')
-    ax.set_xlabel('H')
-    ax.set_ylabel('$K_0 / H$')
-    ax.set_title('Critical Path Fraction $K_0/H$')
-    ax.legend(fontsize=7)
-    ax.grid(alpha=0.3)
+        sub = sorted([r for r in good if r['L'] == Lv], key=lambda r: r['H'])
+        if sub:
+            Hs  = np.array([r['H']           for r in sub], dtype=float)
+            K0s = np.array([r['sigmoid_K_0'] for r in sub])
+            ax_dot.plot(Hs, K0s, 'o-', color=L_col[Lv], lw=2, ms=9,
+                        markeredgecolor='black', markeredgewidth=0.5,
+                        label=f'L={Lv}', zorder=5)
 
-    ax = axes[1]
-    for Hv in unique_H:
-        sub = sorted([r for r in good if r['H'] == Hv], key=lambda r: r['L'])
-        if len(sub) >= 2:
-            Ls = [r['L'] for r in sub]
-            gs = [r['sigmoid_g_eff'] for r in sub]
-            ax.plot(Ls, gs, 'o-', color=H_col[Hv], lw=1.5, ms=7,
-                    label=f'H={Hv}')
-    ax.axhline(1.0, color='red', ls=':', lw=1.5, alpha=0.5)
-    ax.set_xlabel('L (hidden layers)')
-    ax.set_ylabel('$g_{eff}$')
-    ax.set_title('Coupling Strength vs Depth')
-    ax.legend(fontsize=8)
-    ax.grid(alpha=0.3)
+    if scaling and 'K0' in scaling:
+        sr = scaling['K0']
+        H_fine = np.linspace(min(unique_H), max(unique_H), 200)
+        for Lv in unique_L:
+            K0_fit = sr['a'] * H_fine ** sr['alpha'] * Lv ** sr['gamma']
+            ax_dot.plot(H_fine, K0_fit, '--', color=L_col[Lv], alpha=0.45, lw=1.2)
+        formula = (f"$K_0 = {sr['a']:.3f}\\,H^{{{sr['alpha']:.3f}}}"
+                   f"\\,L^{{{sr['gamma']:.3f}}}$  $R^2={sr['R2']:.3f}$")
+        ax_dot.text(0.05, 0.95, formula, transform=ax_dot.transAxes,
+                    fontsize=9, va='top',
+                    bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7))
 
-    ax = axes[2]
+    ax_dot.set_xlabel('H (hidden size)', fontsize=11)
+    ax_dot.set_ylabel('$K_0$', fontsize=11)
+    ax_dot.set_title('$K_0$ vs Width  (lines per L)', fontsize=11)
+    ax_dot.legend(fontsize=8)
+    ax_dot.grid(alpha=0.3)
+
+    # Right: K_0 heatmap
+    H_grid = sorted(set(r['H'] for r in good))
+    L_grid = sorted(set(r['L'] for r in good))
+    data = np.full((len(L_grid), len(H_grid)), np.nan)
     for r in good:
-        Kh = max(1, int(r['sigmoid_K_0'] / 2))
-        Kh = min(Kh, max(r['accs'].keys()))
-        ah = r['accs'].get(Kh, list(r['accs'].values())[0])
-        ax.scatter(r['sigmoid_g_eff'], ah * 100, s=80,
-                   color=L_col[r['L']], edgecolors='black', lw=0.5, zorder=5)
-    ax.set_xlabel('$g_{eff}$')
-    ax.set_ylabel('Accuracy at $K = K_0/2$ (%)')
-    ax.set_title('Compressibility vs Coupling')
-    ax.grid(alpha=0.3)
+        data[L_grid.index(r['L']), H_grid.index(r['H'])] = r['sigmoid_K_0']
+
+    im = ax_heat.imshow(data, aspect='auto', cmap='YlOrRd', origin='lower')
+    ax_heat.set_xticks(range(len(H_grid)))
+    ax_heat.set_xticklabels(H_grid)
+    ax_heat.set_yticks(range(len(L_grid)))
+    ax_heat.set_yticklabels(L_grid)
+    ax_heat.set_xlabel('H (hidden size)', fontsize=11)
+    ax_heat.set_ylabel('L (layers)', fontsize=11)
+    ax_heat.set_title('$K_0$ Heatmap over $(H, L)$ Grid', fontsize=11)
+    plt.colorbar(im, ax=ax_heat, shrink=0.85, label='$K_0$')
+
+    for i in range(len(L_grid)):
+        for j in range(len(H_grid)):
+            if not np.isnan(data[i, j]):
+                val = data[i, j]
+                c = 'white' if val > np.nanmean(data) * 1.3 else 'black'
+                ax_heat.text(j, i, f'{val:.1f}', ha='center', va='center',
+                             fontsize=9, fontweight='bold', color=c)
 
     plt.tight_layout()
-    p = os.path.join(output_dir, 'cifar_scaling_laws.png')
-    plt.savefig(p, dpi=150, bbox_inches='tight')
-    plt.close()
-    paths.append(p)
-    print(f"  Saved: {p}")
-
-    # Figure 3: Heatmaps
-    fig, axes = plt.subplots(1, 3, figsize=(17, 5))
-    fig.suptitle('CIFAR-10 / WANDA — Parameter Heatmaps Across Architecture Grid',
-                 fontsize=13, y=1.03)
-
-    for pidx, (param, label, cmap) in enumerate([
-        ('sigmoid_K_0', '$K_0$', 'YlOrRd'),
-        ('sigmoid_beta', '$\\beta$', 'YlGnBu'),
-        ('sigmoid_g_eff', '$g_{eff}$', 'RdYlGn_r'),
-    ]):
-        ax = axes[pidx]
-        H_grid = sorted(set(r['H'] for r in good))
-        L_grid = sorted(set(r['L'] for r in good))
-        data = np.full((len(L_grid), len(H_grid)), np.nan)
-        for r in good:
-            i = L_grid.index(r['L'])
-            j = H_grid.index(r['H'])
-            data[i, j] = r[param]
-
-        im = ax.imshow(data, aspect='auto', cmap=cmap, origin='lower')
-        ax.set_xticks(range(len(H_grid)))
-        ax.set_xticklabels(H_grid)
-        ax.set_yticks(range(len(L_grid)))
-        ax.set_yticklabels(L_grid)
-        ax.set_xlabel('H (hidden size)')
-        ax.set_ylabel('L (layers)')
-        ax.set_title(label)
-        plt.colorbar(im, ax=ax, shrink=0.8)
-
-        for i in range(len(L_grid)):
-            for j in range(len(H_grid)):
-                if not np.isnan(data[i, j]):
-                    val = data[i, j]
-                    c = 'white' if val > np.nanmean(data) * 1.3 else 'black'
-                    ax.text(j, i, f'{val:.2f}', ha='center', va='center',
-                            fontsize=8, fontweight='bold', color=c)
-
-    plt.tight_layout()
-    p = os.path.join(output_dir, 'cifar_parameter_heatmaps.png')
+    p = os.path.join(output_dir, 'cifar_k0_scaling.png')
     plt.savefig(p, dpi=150, bbox_inches='tight')
     plt.close()
     paths.append(p)

@@ -118,10 +118,10 @@ class TestFCNetworkConstruction:
         """Output layer has C neurons."""
         assert small_model.layers[-1].out_features == small_model.C
 
-    def test_dtype_float64(self, small_model):
-        """All parameters should be float64."""
+    def test_dtype_float32(self, small_model):
+        """All parameters should be float32."""
         for p in small_model.parameters():
-            assert p.dtype == torch.float64
+            assert p.dtype == torch.float32
 
     def test_input_size_stored(self, small_model):
         """input_size attribute is correctly set."""
@@ -145,13 +145,13 @@ class TestForwardPass:
 
     def test_forward_shape(self, small_model):
         """forward() returns [N, C] logits."""
-        X = torch.randn(5, 64, dtype=torch.float64)
+        X = torch.randn(5, 64, dtype=torch.float32)
         out = small_model(X)
         assert out.shape == (5, 10)
 
     def test_forward_with_masks_shapes(self, small_model):
         """forward_with_masks returns logits [N,C] and L masks of [N,H]."""
-        X = torch.randn(5, 64, dtype=torch.float64)
+        X = torch.randn(5, 64, dtype=torch.float32)
         logits, masks = small_model.forward_with_masks(X)
         assert logits.shape == (5, 10)
         assert len(masks) == small_model.L
@@ -160,7 +160,7 @@ class TestForwardPass:
 
     def test_forward_cache_shapes(self, small_model):
         """forward_cache returns logits, L pre-activations, L+1 post-activations."""
-        X = torch.randn(5, 64, dtype=torch.float64)
+        X = torch.randn(5, 64, dtype=torch.float32)
         logits, zs, hs = small_model.forward_cache(X)
         assert logits.shape == (5, 10)
         assert len(zs) == small_model.L
@@ -169,7 +169,7 @@ class TestForwardPass:
 
     def test_forward_matches_forward_with_masks(self, small_model):
         """forward() and forward_with_masks() produce identical logits."""
-        X = torch.randn(8, 64, dtype=torch.float64)
+        X = torch.randn(8, 64, dtype=torch.float32)
         small_model.eval()
         with torch.no_grad():
             logits1 = small_model(X)
@@ -180,23 +180,23 @@ class TestForwardPass:
         """numpy_forward() produces the same result as the torch forward."""
         small_model.eval()
         X_np = np.random.randn(8, 64)
-        X_t = torch.as_tensor(X_np, dtype=torch.float64)
+        X_t = torch.as_tensor(X_np, dtype=torch.float32)
         with torch.no_grad():
             torch_out = small_model(X_t).numpy()
         np_out = small_model.numpy_forward(X_np)
-        np.testing.assert_allclose(torch_out, np_out, atol=1e-10)
+        np.testing.assert_allclose(torch_out, np_out, atol=1e-5)
 
     def test_numpy_masks_match_torch(self, small_model):
         """numpy_forward_with_masks matches torch forward_with_masks."""
         small_model.eval()
         X_np = np.random.randn(8, 64)
-        X_t = torch.as_tensor(X_np, dtype=torch.float64)
+        X_t = torch.as_tensor(X_np, dtype=torch.float32)
         with torch.no_grad():
             t_logits, t_masks = small_model.forward_with_masks(X_t)
         np_logits, np_masks = small_model.numpy_forward_with_masks(X_np)
-        np.testing.assert_allclose(t_logits.numpy(), np_logits, atol=1e-10)
+        np.testing.assert_allclose(t_logits.numpy(), np_logits, atol=1e-5)
         for tm, nm in zip(t_masks, np_masks):
-            np.testing.assert_allclose(tm.numpy(), nm, atol=1e-12)
+            np.testing.assert_allclose(tm.numpy(), nm, atol=1e-6)
 
 
 # ---------------------------------------------------------------------------
@@ -258,7 +258,7 @@ class TestReLUMasks:
 
     def test_masks_are_binary(self, small_model):
         """ReLU masks should only contain 0.0 and 1.0."""
-        X = torch.randn(10, 64, dtype=torch.float64)
+        X = torch.randn(10, 64, dtype=torch.float32)
         _, masks = small_model.forward_with_masks(X)
         for m in masks:
             unique = torch.unique(m)
@@ -266,11 +266,11 @@ class TestReLUMasks:
 
     def test_masks_consistent_with_activations(self, small_model):
         """Mask entries match sign of pre-activation."""
-        X = torch.randn(10, 64, dtype=torch.float64)
+        X = torch.randn(10, 64, dtype=torch.float32)
         _, zs, _ = small_model.forward_cache(X)
         _, masks = small_model.forward_with_masks(X)
         for z, m in zip(zs, masks):
-            expected = (z > 0).to(torch.float64)
+            expected = (z > 0).to(z.dtype)
             assert torch.allclose(m, expected)
 
 
@@ -371,7 +371,7 @@ class TestSparsify:
     def test_sparsify_keeps_k_elements(self):
         """_sparsify should keep exactly K largest-magnitude entries per row."""
         rng = np.random.default_rng(42)
-        mat = rng.randn(10, 20)
+        mat = rng.standard_normal((10, 20))
         result = _sparsify(mat, k=5, H=20)
         for row in result:
             assert np.count_nonzero(row) == 5
@@ -394,7 +394,7 @@ class TestSparsify:
     def test_sparsify_dynamic_3d(self):
         """_sparsify_dynamic works on 3D arrays [B, I, H]."""
         rng = np.random.default_rng(42)
-        arr = rng.randn(2, 4, 8)
+        arr = rng.standard_normal((2, 4, 8))
         result = _sparsify_dynamic(arr, K=3)
         # Each [I, H] slice along B should have at most K non-zeros per row
         for b in range(2):

@@ -2,3 +2,6 @@
 /__pycache__
 /accuracies_all_methods.txt
 LLM_pruning_test.ipynb
+CLAUDE.md
+.pytest_cache
+.venv
