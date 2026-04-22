@@ -59,16 +59,16 @@ def load_data():
 
 # --- Path pruning (signal-based, vectorised) ----------------------------------
 
-def _sparsify(current, k, H):
-    """Keep top-K entries per row by absolute value."""
+def _sparsify_batch(current, k, H):
+    """Keep top-K entries per row by absolute value. current: (N, D, H)"""
     if k >= H:
         return current
-    s = np.abs(current)
     kth = H - k
-    top_idx = np.argpartition(s, kth, axis=1)[:, kth:]
+    top_idx = np.argpartition(np.abs(current), kth, axis=2)[:, :, kth:]
     result = np.zeros_like(current)
-    rows = np.arange(current.shape[0])[:, np.newaxis]
-    result[rows, top_idx] = current[rows, top_idx]
+    n_idx = np.arange(current.shape[0])[:, np.newaxis, np.newaxis]
+    d_idx = np.arange(current.shape[1])[np.newaxis, :, np.newaxis]
+    result[n_idx, d_idx, top_idx] = current[n_idx, d_idx, top_idx]
     return result
 
 
@@ -88,30 +88,24 @@ def evaluate_pruned_accuracy(model, X_test, y_test, k_values):
     normal_acc : float
     """
     W = model.W
-    N = X_test.shape[0]
     H = model.H
     actual_logits, relu_masks_list = model.numpy_forward_with_masks(X_test)
     normal_acc = accuracy(actual_logits, y_test)
 
+    # current: (N, D, H) — path matrix batched over all samples
+    # X_test[:, :, None] is (N, D, 1), W[0].T[None] is (1, D, H)
     accs = {}
-    bias_offset = None
     for K in k_values:
-        pl = np.zeros((N, model.C))
-        for n in range(N):
-            x_n = X_test[n]
-            current = W[0].T * x_n[:, np.newaxis]
-            current *= relu_masks_list[0][n][np.newaxis, :]
-            current = _sparsify(current, K, H)
+        current = X_test[:, :, np.newaxis] * W[0].T[np.newaxis]
+        current *= relu_masks_list[0][:, np.newaxis, :]
+        current = _sparsify_batch(current, K, H)
 
-            for l in range(1, model.L):
-                current = current @ W[l].T
-                current *= relu_masks_list[l][n][np.newaxis, :]
-                current = _sparsify(current, K, H)
+        for l in range(1, model.L):
+            current = current @ W[l].T  # (N, D, H) @ (H, H) → (N, D, H)
+            current *= relu_masks_list[l][:, np.newaxis, :]
+            current = _sparsify_batch(current, K, H)
 
-            pl[n] = (current @ W[-1].T).sum(axis=0)
-
-        if K == H:
-            bias_offset = actual_logits - pl
+        pl = (current @ W[-1].T).sum(axis=1)  # (N, D, C) → (N, C)
         accs[K] = accuracy(pl, y_test)
 
     return accs, normal_acc
@@ -152,10 +146,14 @@ def run_scaling_scan(X_tr, X_val, X_te, y_tr, y_val, y_te):
 
     Returns a list of result dicts, one per successfully trained configuration.
     """
+    # Small H so K_0 lands visibly in the middle of [1, H].
+    # Large H on easy 64-dim digits means even K=1 achieves high accuracy,
+    # hiding the sigmoid transition.
     H_values = [8, 16, 24, 32, 48, 56, 64, 96]
     L_values = [1, 2, 3, 4, 5, 7, 8, 10]
 
     results = []
+    checkpoints = {}
     total = len(H_values) * len(L_values)
     count = 0
 
@@ -180,6 +178,18 @@ def run_scaling_scan(X_tr, X_val, X_te, y_tr, y_val, y_te):
             accs, normal_acc = evaluate_pruned_accuracy(model, X_te, y_te, k_values)
             popt_sig, perr_sig, r2_sig = fit_sigmoid(k_values, accs, normal_acc)
             popt_exp, r2_exp = fit_exponential(k_values, accs, normal_acc)
+
+            checkpoints[(H, L)] = {
+                'state_dict': model.state_dict(),
+                'arch': {
+                    'input_size': 64,
+                    'hidden_size': H,
+                    'num_hidden_layers': L,
+                    'num_classes': 10,
+                },
+                'val_acc': float(val_acc),
+                'normal_acc': float(normal_acc),
+            }
 
             n_params = sum(p.numel() for p in model.parameters())
             res = {
@@ -219,7 +229,7 @@ def run_scaling_scan(X_tr, X_val, X_te, y_tr, y_val, y_te):
             print(f"  [{dt:.0f}s]")
             results.append(res)
 
-    return results
+    return results, checkpoints
 
 
 # --- Scaling law fitting ------------------------------------------------------
@@ -385,39 +395,37 @@ def fit_scaling_laws(results):
 
 # --- Visualisation ------------------------------------------------------------
 
-def make_scaling_plots(results, scaling_results):
-    """Create comprehensive scaling law visualisations (three figures)."""
+def make_scaling_plots(results, scaling_results, output_dir=None):
+    """Two figures: accuracy curves + K_0 scaling (dot+line | heatmap)."""
+    if output_dir is None:
+        output_dir = OUTPUT_DIR
     good = [r for r in results
             if r.get('sigmoid_R2') is not None and r['sigmoid_R2'] > 0.80]
     if len(good) < 3:
         print("  Not enough data for plots")
         return []
 
-    H_arr = np.array([r['H'] for r in good], dtype=float)
-    L_arr = np.array([r['L'] for r in good], dtype=float)
+    H_arr  = np.array([r['H'] for r in good], dtype=float)
+    L_arr  = np.array([r['L'] for r in good], dtype=float)
     K0_arr = np.array([r['sigmoid_K_0'] for r in good])
-    beta_arr = np.array([r['sigmoid_beta'] for r in good])
-    g_arr = np.array([r['sigmoid_g_eff'] for r in good])
-    normal_arr = np.array([r['normal_acc'] for r in good])
 
     unique_L = sorted(set(r['L'] for r in good))
     unique_H = sorted(set(r['H'] for r in good))
-    colors_L = plt.cm.viridis(np.linspace(0.15, 0.85, len(unique_L)))
-    colors_H = plt.cm.plasma(np.linspace(0.15, 0.85, len(unique_H)))
-    L_color = dict(zip(unique_L, colors_L))
-    H_color = dict(zip(unique_H, colors_H))
+    L_color = dict(zip(unique_L, plt.cm.viridis(np.linspace(0.15, 0.85, max(len(unique_L), 1)))))
+    H_color = dict(zip(unique_H, plt.cm.plasma( np.linspace(0.15, 0.85, max(len(unique_H), 1)))))
 
-    # Figure 1: Accuracy curves by architecture
-    fig, axes = plt.subplots(2, 3, figsize=(18, 11))
-    fig.suptitle('Path-Pruning Accuracy Curves by Architecture\n'
-                 'Sigmoid Fit: $A(K) = A_0 + (A_\\infty - A_0)'
-                 '/(1 + e^{-\\beta(K-K_0)})$',
+    # Figure 1: Accuracy curves (top) + K_0 vs H with lines (bottom)
+    n_L_panels = min(len(unique_L), 3)
+    fig = plt.figure(figsize=(6 * n_L_panels, 11))
+    top_axes = [fig.add_subplot(2, n_L_panels, i + 1) for i in range(n_L_panels)]
+    ax_k0 = fig.add_subplot(2, 1, 2)
+    fig.suptitle('Path-Pruning Accuracy Curves & $K_0$ Scaling\n'
+                 '$A(K) = A_0 + (A_\\infty - A_0)/(1 + e^{-\\beta(K-K_0)})$',
                  fontsize=13, y=1.02)
 
-    for idx, L_val in enumerate(unique_L[:3]):
-        ax = axes[0, idx]
-        subset = [r for r in good if r['L'] == L_val]
-        for r in sorted(subset, key=lambda x: x['H']):
+    for idx, L_val in enumerate(unique_L[:n_L_panels]):
+        ax = top_axes[idx]
+        for r in sorted([r for r in good if r['L'] == L_val], key=lambda x: x['H']):
             k_vals = sorted(r['accs'].keys())
             acc_vals = [r['accs'][k] * 100 for k in k_vals]
             k_fine = np.linspace(1, max(k_vals), 300)
@@ -426,171 +434,99 @@ def make_scaling_plots(results, scaling_results):
                 fit_line = sigmoid_fn(k_fine, r['sigmoid_A_inf'], r['sigmoid_A_0'],
                                       r['sigmoid_K_0'], r['sigmoid_beta']) * 100
                 ax.plot(k_fine, fit_line, color=H_color[r['H']], lw=1.5,
-                        label=f'H={r["H"]} (g={r["sigmoid_g_eff"]:.2f})')
+                        label=f'H={r["H"]}  K₀={r["sigmoid_K_0"]:.1f}')
             ax.axhline(r['normal_acc'] * 100, color=H_color[r['H']],
-                        ls=':', lw=0.5, alpha=0.4)
+                       ls=':', lw=0.5, alpha=0.4)
         ax.set_title(f'L = {L_val} layers', fontsize=11)
         ax.set_xlabel('K (paths per pixel)')
         ax.set_ylabel('Accuracy (%)')
         ax.legend(fontsize=7, loc='lower right')
         ax.grid(alpha=0.3)
 
-    # Bottom-left: K0 vs H
-    ax = axes[1, 0]
     for L_val in unique_L:
-        subset = [r for r in good if r['L'] == L_val]
-        if subset:
-            Hs = [r['H'] for r in subset]
-            K0s = [r['sigmoid_K_0'] for r in subset]
-            ax.scatter(Hs, K0s, s=80, color=L_color[L_val], edgecolors='black',
-                       lw=0.5, label=f'L={L_val}', zorder=5)
+        sub = sorted([r for r in good if r['L'] == L_val], key=lambda x: x['H'])
+        if sub:
+            ax_k0.plot([r['H'] for r in sub], [r['sigmoid_K_0'] for r in sub],
+                       'o-', color=L_color[L_val], lw=1.8, ms=8,
+                       markeredgecolor='black', markeredgewidth=0.5,
+                       label=f'L={L_val}', zorder=5)
     if scaling_results and 'K0' in scaling_results:
         sr = scaling_results['K0']
+        H_fine = np.linspace(min(unique_H), max(unique_H), 200)
         for L_val in unique_L:
-            H_fine = np.linspace(min(H_arr), max(H_arr), 100)
-            K0_pred = sr['a'] * H_fine ** sr['alpha'] * L_val ** sr['gamma']
-            ax.plot(H_fine, K0_pred, '--', color=L_color[L_val], alpha=0.5, lw=1)
-    ax.set_xlabel('H (hidden size)')
-    ax.set_ylabel('$K_0$ (inflection point)')
-    ax.set_title('$K_0$ vs Width H')
-    ax.legend(fontsize=8)
-    ax.grid(alpha=0.3)
-
-    # Bottom-center: beta vs H
-    ax = axes[1, 1]
-    for L_val in unique_L:
-        subset = [r for r in good if r['L'] == L_val]
-        if subset:
-            Hs = [r['H'] for r in subset]
-            betas = [r['sigmoid_beta'] for r in subset]
-            ax.scatter(Hs, betas, s=80, color=L_color[L_val], edgecolors='black',
-                       lw=0.5, label=f'L={L_val}', zorder=5)
-    ax.set_xlabel('H (hidden size)')
-    ax.set_ylabel('$\\beta$ (growth rate)')
-    ax.set_title('$\\beta$ vs Width H')
-    ax.legend(fontsize=8)
-    ax.grid(alpha=0.3)
-
-    # Bottom-right: g_eff vs H
-    ax = axes[1, 2]
-    for L_val in unique_L:
-        subset = [r for r in good if r['L'] == L_val]
-        if subset:
-            Hs = [r['H'] for r in subset]
-            gs = [r['sigmoid_g_eff'] for r in subset]
-            ax.scatter(Hs, gs, s=80, color=L_color[L_val], edgecolors='black',
-                       lw=0.5, label=f'L={L_val}', zorder=5)
-    ax.axhline(1.0, color='red', ls=':', lw=1.5, alpha=0.5,
-               label='$g=1$ (strongly coupled)')
-    ax.set_xlabel('H (hidden size)')
-    ax.set_ylabel('$g_{eff} = e^{-\\beta}$')
-    ax.set_title('Effective Coupling vs Width')
-    ax.legend(fontsize=8)
-    ax.grid(alpha=0.3)
+            ax_k0.plot(H_fine, sr['a'] * H_fine ** sr['alpha'] * L_val ** sr['gamma'],
+                       '--', color=L_color[L_val], alpha=0.45, lw=1.2)
+        formula = (f"$K_0 = {sr['a']:.3f}\\,H^{{{sr['alpha']:.3f}}}"
+                   f"\\,L^{{{sr['gamma']:.3f}}}$  $R^2={sr['R2']:.3f}$")
+        ax_k0.text(0.05, 0.95, formula, transform=ax_k0.transAxes, fontsize=9,
+                   va='top', bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7))
+    ax_k0.set_xlabel('H (hidden size)', fontsize=11)
+    ax_k0.set_ylabel('$K_0$ (inflection point)', fontsize=11)
+    ax_k0.set_title('$K_0$ vs Width H', fontsize=12)
+    ax_k0.legend(fontsize=8)
+    ax_k0.grid(alpha=0.3)
 
     plt.tight_layout()
-    path1 = os.path.join(OUTPUT_DIR, 'scaling_curves.png')
+    path1 = os.path.join(output_dir, 'scaling_curves.png')
     plt.savefig(path1, dpi=150, bbox_inches='tight')
     plt.close()
     print(f"  Saved: {path1}")
 
-    # Figure 2: Scaling law summary
-    fig, axes = plt.subplots(1, 3, figsize=(17, 5.5))
-    fig.suptitle('Scaling Laws for Effective Coupling Parameters',
-                 fontsize=13, y=1.03)
+    # Figure 2: K_0 dot+line plot | K_0 heatmap
+    fig, (ax_dot, ax_heat) = plt.subplots(1, 2, figsize=(14, 6))
+    fig.suptitle('sklearn digits — $K_0$ Scaling Law', fontsize=13, y=1.02)
 
-    ax = axes[0]
-    K0_over_H = K0_arr / H_arr
     for L_val in unique_L:
-        mask = L_arr == L_val
-        ax.scatter(H_arr[mask], K0_over_H[mask], s=80, color=L_color[L_val],
-                   edgecolors='black', lw=0.5, label=f'L={L_val}', zorder=5)
-    ax.axhline(K0_over_H.mean(), color='gray', ls='--', lw=1.5, alpha=0.6,
-               label=f'mean={K0_over_H.mean():.2f}')
-    ax.set_xlabel('H (hidden size)')
-    ax.set_ylabel('$K_0 / H$')
-    ax.set_title('Critical Path Fraction $K_0/H$')
-    ax.legend(fontsize=8)
-    ax.grid(alpha=0.3)
+        sub = sorted([r for r in good if r['L'] == L_val], key=lambda x: x['H'])
+        if sub:
+            Hs  = np.array([r['H'] for r in sub], dtype=float)
+            K0s = np.array([r['sigmoid_K_0'] for r in sub])
+            ax_dot.plot(Hs, K0s, 'o-', color=L_color[L_val], lw=2, ms=9,
+                        markeredgecolor='black', markeredgewidth=0.5,
+                        label=f'L={L_val}', zorder=5)
+    if scaling_results and 'K0' in scaling_results:
+        sr = scaling_results['K0']
+        H_fine = np.linspace(min(unique_H), max(unique_H), 200)
+        for L_val in unique_L:
+            ax_dot.plot(H_fine, sr['a'] * H_fine ** sr['alpha'] * L_val ** sr['gamma'],
+                        '--', color=L_color[L_val], alpha=0.45, lw=1.2)
+        formula = (f"$K_0 = {sr['a']:.3f}\\,H^{{{sr['alpha']:.3f}}}"
+                   f"\\,L^{{{sr['gamma']:.3f}}}$  $R^2={sr['R2']:.3f}$")
+        ax_dot.text(0.05, 0.95, formula, transform=ax_dot.transAxes, fontsize=9,
+                    va='top', bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7))
+    ax_dot.set_xlabel('H (hidden size)', fontsize=11)
+    ax_dot.set_ylabel('$K_0$', fontsize=11)
+    ax_dot.set_title('$K_0$ vs Width  (lines per L)', fontsize=11)
+    ax_dot.legend(fontsize=8)
+    ax_dot.grid(alpha=0.3)
 
-    ax = axes[1]
-    for H_val in unique_H:
-        subset = [r for r in good if r['H'] == H_val]
-        if len(subset) >= 2:
-            Ls = sorted([r['L'] for r in subset])
-            gs = [next(r['sigmoid_g_eff'] for r in subset if r['L'] == L)
-                  for L in Ls]
-            ax.plot(Ls, gs, 'o-', color=H_color[H_val], lw=1.5, ms=7,
-                    label=f'H={H_val}')
-    ax.axhline(1.0, color='red', ls=':', lw=1.5, alpha=0.5)
-    ax.set_xlabel('L (number of hidden layers)')
-    ax.set_ylabel('$g_{eff}$')
-    ax.set_title('Coupling Strength vs Depth')
-    ax.legend(fontsize=8)
-    ax.grid(alpha=0.3)
-
-    ax = axes[2]
+    H_grid = sorted(set(r['H'] for r in good))
+    L_grid = sorted(set(r['L'] for r in good))
+    data = np.full((len(L_grid), len(H_grid)), np.nan)
     for r in good:
-        K_half = max(1, int(r['sigmoid_K_0'] / 2))
-        K_half = min(K_half, max(r['accs'].keys()))
-        acc_half = r['accs'].get(K_half, list(r['accs'].values())[0])
-        ax.scatter(r['sigmoid_g_eff'], acc_half * 100, s=80,
-                   color=L_color[r['L']], edgecolors='black', lw=0.5, zorder=5)
-    ax.set_xlabel('$g_{eff} = e^{-\\beta}$')
-    ax.set_ylabel('Accuracy at $K = K_0/2$ (%)')
-    ax.set_title('Compressibility vs Coupling')
-    ax.grid(alpha=0.3)
+        data[L_grid.index(r['L']), H_grid.index(r['H'])] = r['sigmoid_K_0']
+    im = ax_heat.imshow(data, aspect='auto', cmap='YlOrRd', origin='lower')
+    ax_heat.set_xticks(range(len(H_grid))); ax_heat.set_xticklabels(H_grid)
+    ax_heat.set_yticks(range(len(L_grid))); ax_heat.set_yticklabels(L_grid)
+    ax_heat.set_xlabel('H (hidden size)', fontsize=11)
+    ax_heat.set_ylabel('L (layers)', fontsize=11)
+    ax_heat.set_title('$K_0$ Heatmap over $(H, L)$ Grid', fontsize=11)
+    plt.colorbar(im, ax=ax_heat, shrink=0.85, label='$K_0$')
+    for i in range(len(L_grid)):
+        for j in range(len(H_grid)):
+            if not np.isnan(data[i, j]):
+                val = data[i, j]
+                c = 'white' if val > np.nanmean(data) * 1.3 else 'black'
+                ax_heat.text(j, i, f'{val:.1f}', ha='center', va='center',
+                             fontsize=9, fontweight='bold', color=c)
 
     plt.tight_layout()
-    path2 = os.path.join(OUTPUT_DIR, 'scaling_laws.png')
+    path2 = os.path.join(output_dir, 'k0_scaling.png')
     plt.savefig(path2, dpi=150, bbox_inches='tight')
     plt.close()
     print(f"  Saved: {path2}")
 
-    # Figure 3: Heatmaps
-    fig, axes = plt.subplots(1, 3, figsize=(17, 5))
-    fig.suptitle('Parameter Heatmaps Across Architecture Grid',
-                 fontsize=13, y=1.03)
-
-    for idx, (param, label, cmap) in enumerate([
-        ('sigmoid_K_0', '$K_0$', 'YlOrRd'),
-        ('sigmoid_beta', '$\\beta$', 'YlGnBu'),
-        ('sigmoid_g_eff', '$g_{eff}$', 'RdYlGn_r'),
-    ]):
-        ax = axes[idx]
-        H_grid = sorted(set(r['H'] for r in good))
-        L_grid = sorted(set(r['L'] for r in good))
-        data = np.full((len(L_grid), len(H_grid)), np.nan)
-        for r in good:
-            i = L_grid.index(r['L'])
-            j = H_grid.index(r['H'])
-            data[i, j] = r[param]
-
-        im = ax.imshow(data, aspect='auto', cmap=cmap, origin='lower')
-        ax.set_xticks(range(len(H_grid)))
-        ax.set_xticklabels(H_grid)
-        ax.set_yticks(range(len(L_grid)))
-        ax.set_yticklabels(L_grid)
-        ax.set_xlabel('H (hidden size)')
-        ax.set_ylabel('L (layers)')
-        ax.set_title(label)
-        plt.colorbar(im, ax=ax, shrink=0.8)
-
-        for i in range(len(L_grid)):
-            for j in range(len(H_grid)):
-                if not np.isnan(data[i, j]):
-                    c = ('white' if data[i, j] > np.nanmean(data) * 1.3
-                         else 'black')
-                    ax.text(j, i, f'{data[i, j]:.2f}', ha='center',
-                            va='center', fontsize=8, fontweight='bold', color=c)
-
-    plt.tight_layout()
-    path3 = os.path.join(OUTPUT_DIR, 'parameter_heatmaps.png')
-    plt.savefig(path3, dpi=150, bbox_inches='tight')
-    plt.close()
-    print(f"  Saved: {path3}")
-
-    return [path1, path2, path3]
+    return [path1, path2]
 
 
 # --- Main ---------------------------------------------------------------------
@@ -609,7 +545,7 @@ if __name__ == '__main__':
           f" Test={X_te.shape[0]}")
 
     print("\n  Starting architecture scan...")
-    results = run_scaling_scan(X_tr, X_val, X_te, y_tr, y_val, y_te)
+    results, checkpoints = run_scaling_scan(X_tr, X_val, X_te, y_tr, y_val, y_te)
 
     with open(os.path.join(OUTPUT_DIR, 'scaling_results.json'), 'w') as f:
         clean_results = []
@@ -655,6 +591,11 @@ if __name__ == '__main__':
     if scaling_results:
         with open(os.path.join(OUTPUT_DIR, 'scaling_laws.json'), 'w') as f:
             json.dump(scaling_results, f, indent=2)
+
+    ckpt_path = os.path.join(OUTPUT_DIR, 'checkpoints.pt')
+    torch.save(checkpoints, ckpt_path)
+    print(f"\n  Saved {len(checkpoints)} model checkpoints → {ckpt_path}")
+    print("  To load: ckpts = torch.load('checkpoints.pt'); arch = ckpts[(H, L)]['arch']")
 
     dt = time.time() - t_total
     print(f"\n  Total runtime: {dt:.0f}s")
