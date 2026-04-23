@@ -92,13 +92,16 @@ Experiments run on four datasets to cover a range of input dimensions:
 
 The same sigmoid transition appears in accuracy vs weight density $s$, and $s_0$ follows power laws in architecture:
 
+WANDA unstructured pruning scaling laws across all four datasets:
+
 | Dataset | Scaling Law | $R^2_{\text{adj}}$ |
 |---------|------------|:---:|
-| sklearn digits | $s_0 = 0.089 \cdot H^{0.65} \cdot L^{0.90}$ | 0.95 |
-| MNIST 28x28 | $s_0 = 0.388 \cdot H^{0.69} \cdot L^{0.99}$ | 0.82 |
-| CIFAR-10 + PCA | $s_0 = 0.236 \cdot H^{0.91} \cdot L^{0.83}$ | 0.78 |
+| sklearn digits | $s_0 = 0.247 \cdot H^{-0.35} \cdot L^{0.76}$ | 0.90 |
+| MNIST 28x28 | $s_0 = 0.360 \cdot H^{-0.47} \cdot L^{0.69}$ | 0.92 |
+| CIFAR-10 + PCA(200) | $s_0 = 0.302 \cdot H^{-0.29} \cdot L^{0.60}$ | 0.87 |
+| CIFAR-10 + ResNet18 | $s_0 = 0.257 \cdot H^{-0.35} \cdot L^{0.54}$ | 0.94 |
 
-Notably, the depth exponent ($\gamma \approx 0.9$-$1.0$) is consistent across datasets, suggesting that each additional layer contributes roughly proportionally to the network's weight-level redundancy.
+The width exponent is consistently negative ($\alpha \approx -0.3$ to $-0.5$), so wider networks achieve their critical recovery at a smaller weight fraction — more parameters provide more redundant paths. The depth exponent is positive ($\gamma \approx 0.5$-$0.8$), meaning deeper networks need a larger density to recover.
 
 <p align="center">
   <img src="assets/mnist28_figures/mnist28_scaling_curves.png" width="85%" alt="MNIST 28x28 unstructured scaling curves"/>
