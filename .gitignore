@@ -5,3 +5,6 @@ LLM_pruning_test.ipynb
 CLAUDE.md
 .pytest_cache
 .venv
+docs
+cluster_info.md
+submit_instructions.md
