@@ -34,8 +34,8 @@ PCA_DIM = 200
 TEST_SIZE = 1500
 SEED = 42
 
-H_VALUES = [64, 128, 256, 512]
-L_VALUES = [2, 3, 5, 7, 10]
+H_VALUES = [64, 96, 128, 192, 256, 384, 512]
+L_VALUES = [2, 3, 4, 5, 6, 7, 8, 10]
 
 
 def load_cifar_pca():
@@ -84,11 +84,11 @@ def load_cifar_pca():
     return X_tr, X_val, X_te, y_tr, y_val, y_te
 
 
-def main(method='random', output_dir=None):
+def main(method='random', output_dir=None, n_repeats=1):
     if method not in UNSTRUCTURED_METHODS:
         raise SystemExit(f"unknown method '{method}'")
     if output_dir is None:
-        output_dir = f'unstructured_figures_cifar_pca_{method}'
+        output_dir = f'unstructured_pruning/figures/unstructured_figures_cifar_pca_{method}'
 
     np.random.seed(SEED); torch.manual_seed(SEED)
     print("=" * 70)
@@ -107,7 +107,8 @@ def main(method='random', output_dir=None):
         output_dir=output_dir,
         dataset_label=f'CIFAR-10 + PCA({PCA_DIM})',
         epochs_fn=lambda H, L: 500,
-        bs=128, lr=1e-3, n_seeds=3, seed=SEED, val_acc_floor=0.15,
+        bs=128, lr=1e-3, n_seeds=3, n_repeats=n_repeats,
+        seed=SEED, val_acc_floor=0.15,
     )
     print("  Done!")
 
@@ -117,5 +118,8 @@ if __name__ == '__main__':
     ap.add_argument('--method', default='random',
                     choices=list(UNSTRUCTURED_METHODS))
     ap.add_argument('--output-dir', default=None)
+    ap.add_argument('--n-repeats', type=int, default=1,
+                    help='independent (train, mask, fit) trials per (H, L)')
     args = ap.parse_args()
-    main(method=args.method, output_dir=args.output_dir)
+    main(method=args.method, output_dir=args.output_dir,
+         n_repeats=args.n_repeats)

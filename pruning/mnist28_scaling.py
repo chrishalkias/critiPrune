@@ -384,7 +384,7 @@ def make_plots(results, scaling, output_dir):
         for r in sorted([r for r in good if r['L'] == Lv], key=lambda r: r['H']):
             ks = sorted(r['accs'].keys())
             accs_v = [r['accs'][k] * 100 for k in ks]
-            k_fine = np.linspace(1, max(ks), 300)
+            k_fine = np.geomspace(max(1, min(ks)), max(ks), 300)
             ax.scatter(ks, accs_v, s=12, color=H_col[r['H']], alpha=0.7)
             if r.get('sigmoid_R2') and r['sigmoid_R2'] > 0.80:
                 if r.get('sigmoid_perr'):
@@ -399,9 +399,10 @@ def make_plots(results, scaling, output_dir):
                        ls=':', lw=0.5, alpha=0.4)
         ax.set_title(f'L = {Lv} layers', fontsize=11)
         ax.set_xlabel('K (neurons kept)')
+        ax.set_xscale('log')
         ax.set_ylabel('Accuracy (%)')
         ax.legend(fontsize=7, loc='lower right')
-        ax.grid(alpha=0.3)
+        ax.grid(alpha=0.3, which='both')
 
     for Lv in unique_L:
         sub = sorted([r for r in good if r['L'] == Lv], key=lambda r: r['H'])
@@ -412,7 +413,7 @@ def make_plots(results, scaling, output_dir):
                        label=f'L={Lv}', zorder=5)
     if scaling and 'K0' in scaling:
         sr = scaling['K0']
-        H_fine = np.linspace(min(unique_H), max(unique_H), 200)
+        H_fine = np.geomspace(min(unique_H), max(unique_H), 200)
         for Lv in unique_L:
             ax_k0.plot(H_fine, sr['a'] * H_fine ** sr['alpha'] * Lv ** sr['gamma'],
                        '--', color=L_col[Lv], alpha=0.45, lw=1.2)
@@ -421,10 +422,11 @@ def make_plots(results, scaling, output_dir):
         ax_k0.text(0.05, 0.95, formula, transform=ax_k0.transAxes, fontsize=9,
                    va='top', bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7))
     ax_k0.set_xlabel('H (hidden size)', fontsize=11)
+    ax_k0.set_xscale('log')
     ax_k0.set_ylabel('$K_0$ (inflection point)', fontsize=11)
     ax_k0.set_title('$K_0$ vs Width H', fontsize=12)
     ax_k0.legend(fontsize=8)
-    ax_k0.grid(alpha=0.3)
+    ax_k0.grid(alpha=0.3, which='both')
 
     plt.tight_layout()
     p = os.path.join(output_dir, 'mnist28_scaling_curves.png')
@@ -449,7 +451,7 @@ def make_plots(results, scaling, output_dir):
                         label=f'L={Lv}', zorder=5)
     if scaling and 'K0' in scaling:
         sr = scaling['K0']
-        H_fine = np.linspace(min(unique_H), max(unique_H), 200)
+        H_fine = np.geomspace(min(unique_H), max(unique_H), 200)
         for Lv in unique_L:
             ax_dot.plot(H_fine, sr['a'] * H_fine ** sr['alpha'] * Lv ** sr['gamma'],
                         '--', color=L_col[Lv], alpha=0.45, lw=1.2)
@@ -458,10 +460,11 @@ def make_plots(results, scaling, output_dir):
         ax_dot.text(0.05, 0.95, formula, transform=ax_dot.transAxes, fontsize=9,
                     va='top', bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7))
     ax_dot.set_xlabel('H (hidden size)', fontsize=11)
+    ax_dot.set_xscale('log')
     ax_dot.set_ylabel('$K_0$', fontsize=11)
     ax_dot.set_title('$K_0$ vs Width  (lines per L)', fontsize=11)
     ax_dot.legend(fontsize=8)
-    ax_dot.grid(alpha=0.3)
+    ax_dot.grid(alpha=0.3, which='both')
 
     H_grid = sorted(set(r['H'] for r in good))
     L_grid = sorted(set(r['L'] for r in good))

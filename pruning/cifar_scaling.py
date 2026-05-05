@@ -451,7 +451,7 @@ def make_plots(results, scaling, output_dir):
         for r in subset:
             ks     = sorted(r['accs'].keys())
             accs_v = [r['accs'][k] * 100 for k in ks]
-            k_fine = np.linspace(1, max(ks), 300)
+            k_fine = np.geomspace(max(1, min(ks)), max(ks), 300)
             ax.scatter(ks, accs_v, s=12, color=H_col[r['H']], alpha=0.7)
             if r.get('sigmoid_R2') and r['sigmoid_R2'] > 0.80:
                 fit = sigmoid_fn(k_fine, r['sigmoid_A_inf'], r['sigmoid_A_0'],
@@ -460,9 +460,10 @@ def make_plots(results, scaling, output_dir):
                         label=f'H={r["H"]}  K₀={r["sigmoid_K_0"]:.1f}')
         ax.set_title(f'L = {Lv} layers', fontsize=11)
         ax.set_xlabel('K (paths per feature)')
+        ax.set_xscale('log')
         ax.set_ylabel('Accuracy (%)')
         ax.legend(fontsize=7, loc='lower right')
-        ax.grid(alpha=0.3)
+        ax.grid(alpha=0.3, which='both')
 
     # K_0 vs H with dots connected per L
     for Lv in unique_L:
@@ -474,10 +475,11 @@ def make_plots(results, scaling, output_dir):
                        markeredgecolor='black', markeredgewidth=0.5,
                        label=f'L={Lv}', zorder=5)
     ax_k0.set_xlabel('H (hidden size)', fontsize=11)
+    ax_k0.set_xscale('log')
     ax_k0.set_ylabel('$K_0$ (inflection point)', fontsize=11)
     ax_k0.set_title('$K_0$ vs Width H', fontsize=12)
     ax_k0.legend(fontsize=8)
-    ax_k0.grid(alpha=0.3)
+    ax_k0.grid(alpha=0.3, which='both')
 
     plt.tight_layout()
     p = os.path.join(output_dir, 'cifar_scaling_curves.png')
@@ -504,7 +506,7 @@ def make_plots(results, scaling, output_dir):
 
     if scaling and 'K0' in scaling:
         sr = scaling['K0']
-        H_fine = np.linspace(min(unique_H), max(unique_H), 200)
+        H_fine = np.geomspace(min(unique_H), max(unique_H), 200)
         for Lv in unique_L:
             K0_fit = sr['a'] * H_fine ** sr['alpha'] * Lv ** sr['gamma']
             ax_dot.plot(H_fine, K0_fit, '--', color=L_col[Lv], alpha=0.45, lw=1.2)
@@ -515,10 +517,11 @@ def make_plots(results, scaling, output_dir):
                     bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7))
 
     ax_dot.set_xlabel('H (hidden size)', fontsize=11)
+    ax_dot.set_xscale('log')
     ax_dot.set_ylabel('$K_0$', fontsize=11)
     ax_dot.set_title('$K_0$ vs Width  (lines per L)', fontsize=11)
     ax_dot.legend(fontsize=8)
-    ax_dot.grid(alpha=0.3)
+    ax_dot.grid(alpha=0.3, which='both')
 
     # Right: K_0 heatmap
     H_grid = sorted(set(r['H'] for r in good))

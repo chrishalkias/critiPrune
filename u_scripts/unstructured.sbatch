@@ -24,6 +24,7 @@ mkdir -p slurm_logs
 
 : "${DATASET:?must export DATASET}"
 : "${METHOD:?must export METHOD}"
+: "${N_REPEATS:=1}"
 
 case "$DATASET" in
     sklearn)      MODULE="unstructured_pruning.mnist_scaling"         ;;
@@ -33,13 +34,14 @@ case "$DATASET" in
     *) echo "unknown DATASET: $DATASET" >&2; exit 2 ;;
 esac
 
-OUTPUT_DIR="unstructured_figures_${DATASET}_${METHOD}"
+OUTPUT_DIR="unstructured_pruning/figures/unstructured_figures_${DATASET}_${METHOD}"
 mkdir -p "$OUTPUT_DIR"
 
 echo "=================================================================="
 echo "  Job       : $SLURM_JOB_ID  ($SLURM_JOB_NAME)"
 echo "  Dataset   : $DATASET"
 echo "  Method    : $METHOD"
+echo "  N_REPEATS : $N_REPEATS"
 echo "  Module    : $MODULE"
 echo "  Output    : $OUTPUT_DIR"
 echo "  Node      : $SLURM_NODELIST"
@@ -68,6 +70,6 @@ esac
 
 python3 -c "import torch; print('CUDA:', torch.cuda.is_available(), '|', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'N/A')"
 
-python3 -m "$MODULE" --method "$METHOD" --output-dir "$OUTPUT_DIR"
+python3 -m "$MODULE" --method "$METHOD" --output-dir "$OUTPUT_DIR" --n-repeats "$N_REPEATS"
 
 echo "Job completed at $(date)"

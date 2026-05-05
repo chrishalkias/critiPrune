@@ -428,7 +428,7 @@ def make_scaling_plots(results, scaling_results, output_dir=None):
         for r in sorted([r for r in good if r['L'] == L_val], key=lambda x: x['H']):
             k_vals = sorted(r['accs'].keys())
             acc_vals = [r['accs'][k] * 100 for k in k_vals]
-            k_fine = np.linspace(1, max(k_vals), 300)
+            k_fine = np.geomspace(max(1, min(k_vals)), max(k_vals), 300)
             ax.scatter(k_vals, acc_vals, s=12, color=H_color[r['H']], alpha=0.7)
             if r.get('sigmoid_R2') and r['sigmoid_R2'] > 0.80:
                 fit_line = sigmoid_fn(k_fine, r['sigmoid_A_inf'], r['sigmoid_A_0'],
@@ -439,9 +439,10 @@ def make_scaling_plots(results, scaling_results, output_dir=None):
                        ls=':', lw=0.5, alpha=0.4)
         ax.set_title(f'L = {L_val} layers', fontsize=11)
         ax.set_xlabel('K (paths per pixel)')
+        ax.set_xscale('log')
         ax.set_ylabel('Accuracy (%)')
         ax.legend(fontsize=7, loc='lower right')
-        ax.grid(alpha=0.3)
+        ax.grid(alpha=0.3, which='both')
 
     for L_val in unique_L:
         sub = sorted([r for r in good if r['L'] == L_val], key=lambda x: x['H'])
@@ -452,7 +453,7 @@ def make_scaling_plots(results, scaling_results, output_dir=None):
                        label=f'L={L_val}', zorder=5)
     if scaling_results and 'K0' in scaling_results:
         sr = scaling_results['K0']
-        H_fine = np.linspace(min(unique_H), max(unique_H), 200)
+        H_fine = np.geomspace(min(unique_H), max(unique_H), 200)
         for L_val in unique_L:
             ax_k0.plot(H_fine, sr['a'] * H_fine ** sr['alpha'] * L_val ** sr['gamma'],
                        '--', color=L_color[L_val], alpha=0.45, lw=1.2)
@@ -461,10 +462,11 @@ def make_scaling_plots(results, scaling_results, output_dir=None):
         ax_k0.text(0.05, 0.95, formula, transform=ax_k0.transAxes, fontsize=9,
                    va='top', bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7))
     ax_k0.set_xlabel('H (hidden size)', fontsize=11)
+    ax_k0.set_xscale('log')
     ax_k0.set_ylabel('$K_0$ (inflection point)', fontsize=11)
     ax_k0.set_title('$K_0$ vs Width H', fontsize=12)
     ax_k0.legend(fontsize=8)
-    ax_k0.grid(alpha=0.3)
+    ax_k0.grid(alpha=0.3, which='both')
 
     plt.tight_layout()
     path1 = os.path.join(output_dir, 'scaling_curves.png')
@@ -486,7 +488,7 @@ def make_scaling_plots(results, scaling_results, output_dir=None):
                         label=f'L={L_val}', zorder=5)
     if scaling_results and 'K0' in scaling_results:
         sr = scaling_results['K0']
-        H_fine = np.linspace(min(unique_H), max(unique_H), 200)
+        H_fine = np.geomspace(min(unique_H), max(unique_H), 200)
         for L_val in unique_L:
             ax_dot.plot(H_fine, sr['a'] * H_fine ** sr['alpha'] * L_val ** sr['gamma'],
                         '--', color=L_color[L_val], alpha=0.45, lw=1.2)
@@ -495,10 +497,11 @@ def make_scaling_plots(results, scaling_results, output_dir=None):
         ax_dot.text(0.05, 0.95, formula, transform=ax_dot.transAxes, fontsize=9,
                     va='top', bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7))
     ax_dot.set_xlabel('H (hidden size)', fontsize=11)
+    ax_dot.set_xscale('log')
     ax_dot.set_ylabel('$K_0$', fontsize=11)
     ax_dot.set_title('$K_0$ vs Width  (lines per L)', fontsize=11)
     ax_dot.legend(fontsize=8)
-    ax_dot.grid(alpha=0.3)
+    ax_dot.grid(alpha=0.3, which='both')
 
     H_grid = sorted(set(r['H'] for r in good))
     L_grid = sorted(set(r['L'] for r in good))

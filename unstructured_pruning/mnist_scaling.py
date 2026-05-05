@@ -22,19 +22,17 @@ from unstructured_pruning.core import run_scaling_experiment, DEFAULT_DENSITIES 
 from unstructured_pruning.methods import UNSTRUCTURED_METHODS  # noqa: E402
 
 
-H_VALUES = [8, 16, 24, 32, 48, 56, 64, 96]
-L_VALUES = [1, 2, 3, 4, 5, 7, 8, 10]
+H_VALUES = [8, 12, 16, 20, 24, 32, 40, 48, 56, 64, 80, 96]
+L_VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 SEED = 42
 
 
-def main(method='random', output_dir=None):
+def main(method='random', output_dir=None, n_repeats=1):
     if method not in UNSTRUCTURED_METHODS:
         raise SystemExit(f"unknown method '{method}'. "
                          f"Choose from: {list(UNSTRUCTURED_METHODS)}")
     if output_dir is None:
-        output_dir = ('unstructured_figures'
-                      if method == 'random'
-                      else f'unstructured_figures_{method}')
+        output_dir = f'unstructured_pruning/figures/unstructured_figures_sklearn_{method}'
 
     np.random.seed(SEED); torch.manual_seed(SEED)
     print("=" * 70)
@@ -55,7 +53,8 @@ def main(method='random', output_dir=None):
         output_dir=output_dir,
         dataset_label='sklearn digits',
         epochs_fn=lambda H, L: 300 if H >= 32 else 500,
-        bs=64, lr=1e-3, n_seeds=3, seed=SEED, val_acc_floor=0.20,
+        bs=64, lr=1e-3, n_seeds=3, n_repeats=n_repeats,
+        seed=SEED, val_acc_floor=0.20,
     )
     print("  Done!")
 
@@ -65,5 +64,8 @@ if __name__ == '__main__':
     ap.add_argument('--method', default='random',
                     choices=list(UNSTRUCTURED_METHODS))
     ap.add_argument('--output-dir', default=None)
+    ap.add_argument('--n-repeats', type=int, default=1,
+                    help='independent (train, mask, fit) trials per (H, L)')
     args = ap.parse_args()
-    main(method=args.method, output_dir=args.output_dir)
+    main(method=args.method, output_dir=args.output_dir,
+         n_repeats=args.n_repeats)
