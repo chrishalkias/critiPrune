@@ -12,3 +12,6 @@ cluster_info.md
 submit_instructions.md
 slurm_logs
 unstructured_pruning/checkpoints/
+unstructured_pruning/checkpoints.zip
+unstructured_pruning/figures/figures.zip
+**/.DS_Store

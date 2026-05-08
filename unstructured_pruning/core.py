@@ -176,6 +176,7 @@ def run_scaling_experiment(
     lr=1e-3,
     n_seeds=3,                  # only used for random
     n_repeats=1,                # independent (train, mask, fit) trials per (H, L)
+    extra_repeat_cells=None,    # set of (H, L) eligible for r>=1; others get r=0 only
     seed=42,
     val_acc_floor=0.15,
     device=None,
@@ -218,13 +219,19 @@ def run_scaling_experiment(
         print(f"  Resume: loaded {len(results)} existing rows "
               f"({len(finished)} unique (H,L,repeat) triples)")
 
-    total = len(h_values) * len(l_values) * n_repeats
+    def _n_repeats_for_cell(H, L):
+        if extra_repeat_cells is None:
+            return n_repeats
+        return n_repeats if (int(H), int(L)) in extra_repeat_cells else 1
+
+    total = sum(_n_repeats_for_cell(H, L)
+                for H in h_values for L in l_values)
     count = 0
     t_total = time.time()
 
     for H in h_values:
         for L in l_values:
-            for r in range(n_repeats):
+            for r in range(_n_repeats_for_cell(H, L)):
                 count += 1
                 if (int(H), int(L), int(r)) in finished:
                     print(f"\n  [{count}/{total}] H={H}, L={L}, r={r}  "
@@ -511,9 +518,10 @@ def make_plots(results, scaling, output_dir, title_prefix=''):
             v = data_mean[i, j]
             sd = data_std[i, j]
             c = 'white' if v > np.nanmean(data_mean) * 1.3 else 'black'
-            label = f'{v:.3f}\n±{sd:.3f}' if has_repeats and sd > 0 else f'{v:.3f}'
+            label = (f'{v:.2g}\n±{sd:.2g}'
+                     if has_repeats and sd > 0 else f'{v:.2g}')
             ax_heat.text(j, i, label, ha='center', va='center',
-                         fontsize=7, fontweight='bold', color=c)
+                         fontsize=5, fontweight='bold', color=c)
 
     plt.tight_layout()
     p2 = os.path.join(output_dir, 's0_scaling.png')
