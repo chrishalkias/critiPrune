@@ -150,6 +150,22 @@ DEFAULT_DENSITIES = [0.01, 0.02, 0.05, 0.075, 0.10, 0.15, 0.20, 0.30,
 CHECKPOINT_BASE = 'unstructured_pruning/checkpoints'
 
 
+def load_fc_checkpoint(ckpt_path, device='cpu'):
+    """Load a saved FCNetwork checkpoint and return (model, ckpt_dict).
+
+    Encapsulates the dependency on ``pruning.pruning.FCNetwork`` so that
+    downstream tools (e.g. ``unstructured_pruning.loss_scaling``) only
+    need to import from the ``unstructured_pruning`` package.
+    """
+    from pruning.pruning import FCNetwork  # local import: heavy + side effects
+    ckpt = torch.load(ckpt_path, map_location='cpu', weights_only=True)
+    model = FCNetwork(**ckpt['arch'])
+    model.load_state_dict(ckpt['state_dict'])
+    if device != 'cpu':
+        model = model.to(device)
+    return model, ckpt
+
+
 def _build_masks(method, model, densities, n_seeds, base_seed, X_calib):
     from .methods import random_masks, magnitude_masks, wanda_masks
     if method == 'random':
