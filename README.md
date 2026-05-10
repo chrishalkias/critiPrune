@@ -2,201 +2,223 @@
 
 **Neural Network Pruning as a Phase Transition**
 
-> Pruning neural networks reveals a universal sigmoid recovery law with a sharp critical threshold, analogous to a second-order phase transition in statistical mechanics. This holds whether you prune whole neurons (structured) or individual weights (unstructured), and whether the network is a tiny FC classifier or a billion-parameter LLM.
+> Pruning a trained neural network reveals a sharp, second-order phase transition. Test accuracy as a function of surviving-weight density $s$ collapses onto a universal sigmoid with a critical inflection $s_0$, and $s_0$ obeys clean power-law scaling in width $H$ and depth $L$. Sweeping a controlled inference-time disorder amplitude $\sigma$ in addition to $s$ traces the critical line and singles out the **Sherrington–Kirkpatrick bond-disorder** mean-field universality class as the right physical model.
 
 ---
 
 ## Key Finding
 
-When neurons are progressively restored to a pruned network, accuracy does not recover gradually. Instead it undergoes a sharp sigmoidal transition at a critical fraction $K_0$:
-
-$$A(K) = A_0 + \frac{A_\infty - A_0}{1 + e^{-\beta(K - K_0)}}$$
-
-The sigmoid parameters follow power-law scaling in architecture:
-
-$$K_0 \approx c \cdot H^\alpha \cdot L^\gamma \qquad \beta \approx c' \cdot H^{\alpha'} \cdot L^{\gamma'}$$
-
-where $H$ is hidden width and $L$ is depth. For unstructured (weight-level) pruning the same sigmoid applies, but the x-axis is weight density $s \in (0,1]$ instead of neuron count $K$:
+When weights are progressively restored to a pruned network, accuracy does not recover gradually. Instead it undergoes a sharp sigmoidal transition at a critical density $s_0$:
 
 $$A(s) = A_0 + \frac{A_\infty - A_0}{1 + e^{-\beta(s - s_0)}}$$
 
-The pattern holds across FC networks, the Pythia transformer family, and mixed open-source LLMs, which points to a universal mechanism tied to the combinatorial structure of neural paths.
+The inflection $s_0$ follows a power law in architecture,
 
-| Parameter | Physical Analogy |
-|-----------|-----------------|
-| $K_0$ | Critical pruning threshold, the phase transition point |
-| $\beta$ | Inverse correlation length, steepness of the transition |
-| $g_{\text{eff}} = e^{-\beta}$ | Effective coupling constant |
+$$s_0(H, L) \;=\; c \cdot H^{\alpha} \cdot L^{\gamma},$$
+
+and, when an additive Gaussian weight perturbation of amplitude $\sigma$ is applied at inference time, the empirical critical line is **parabolic** in $\sigma$ inside the ferromagnetic regime $\sigma \le J_0$,
+
+$$p_c(\sigma) \;=\; \underbrace{\frac{T_0}{J_0}}_{a} \;+\; \underbrace{0}_{b}\,\sigma \;+\; \underbrace{\frac{1}{2 J_0^2}}_{c}\,\sigma^2,$$
+
+with vanishing linear coefficient. This is the Sherrington–Kirkpatrick bond-disorder prediction, *not* the strict Curie–Weiss form $p_c \propto \sigma$: the noise knob acts as the disorder amplitude $J_1$, not as a Boltzmann temperature. Beyond $\sigma \approx J_0$ the parabola breaks down — empirically this F→SG / thermalisation transition is observed in 9 of 27 architecture cells, all at the largest depths.
+
+| Parameter | Physical analogy |
+|-----------|------------------|
+| $s_0$ | Critical pruning threshold (phase transition point) |
+| $\beta$ | Inverse correlation length (steepness of the transition) |
+| $a$ in $p_c(\sigma) = a + c\sigma^2$ | Operating temperature ratio $T_0/J_0$ |
+| $c$ | $1/(2J_0^2)$ — direct estimator of the effective coupling |
 
 ---
 
-## Results
+## Main Results
 
-### Pruning Method Comparison (sklearn digits)
+### 1. Sigmoid recovery & power-law scaling (`unstructured_pruning/`)
 
-Five structured pruning strategies on a 5-layer, 64-hidden FC network. Signal pruning ($|W \cdot x|$) recovers accuracy earliest ($K_0 \approx 11$), while weight-magnitude, WANDA, and random pruning need nearly the full network ($K_0 \approx 54$). All methods produce sigmoidal recovery curves with high adjusted $R^2$.
+We sweep a dense $H \times L$ architecture grid on four datasets, prune trained checkpoints with three protocols (random Bernoulli, weight-magnitude, WANDA) at 15 density levels, and fit the four-parameter sigmoid per cell.
 
-<p align="center">
-  <img src="assets/mnist/pruning_comparison.png" width="85%" alt="Pruning method comparison on MNIST"/>
-</p>
+| Dataset | Input dim | $H$ grid | $L$ grid |
+|---|---|---|---|
+| sklearn-digits | 64 | $\{8, 10, 12, \ldots, 96\}$ (23 values) | $\{1, 2, \ldots, 10\}$ |
+| MNIST 28×28 | 784 | $\{64, 80, \ldots, 512\}$ (13 values) | $\{2, 3, \ldots, 10\}$ |
+| CIFAR-PCA(200) | 200 | same | same |
+| CIFAR-ResNet18 | 512 | same | same |
 
-### Structured Pruning: Scaling Curves
+The sigmoid fit succeeds with adjusted $R^2 > 0.9$ in the overwhelming majority of cells. The inflection $s_0$ obeys $s_0 \propto H^\alpha L^\gamma$ with consistent signs across all four datasets:
 
-Sigmoid fits over a grid of $H \in \{8, 16, 24, 32, 48, 56, 64, 96\}$ and $L \in \{1, 2, 3, 4, 5, 7, 8, 10\}$ on sklearn digits, and $H \in \{32, 64, 128, 256\}$ and $L \in \{2, 3, 5, 7, 10\}$ on CIFAR-10. The critical threshold $K_0$ grows with both width and depth, while $\beta$ decreases, so wider and deeper networks have smoother, later transitions.
+| Dataset | WANDA scaling law | $R^2_\text{adj}$ |
+|---|---|:---:|
+| sklearn-digits      | $s_0 = 0.247 \cdot H^{-0.34} \cdot L^{0.77}$ | 0.90 |
+| MNIST 28×28         | $s_0 = 0.360 \cdot H^{-0.43} \cdot L^{0.64}$ | 0.92 |
+| CIFAR-PCA(200)      | $s_0 = 0.302 \cdot H^{-0.31} \cdot L^{0.61}$ | 0.87 |
+| CIFAR-ResNet18      | $s_0 = 0.257 \cdot H^{-0.41} \cdot L^{0.49}$ | 0.94 |
 
-<p align="center">
-  <img src="assets/mnist_figures/scaling_curves.png" width="85%" alt="sklearn digits scaling curves across architectures"/>
-</p>
-
-<p align="center">
-  <img src="assets/cifar/cifar_scaling_curves.png" width="85%" alt="CIFAR-10 scaling curves across architectures"/>
-</p>
-
-### Structured Pruning: Power-Law Scaling Laws
-
-Extracted sigmoid parameters ($K_0$, $\beta$, $g_{\text{eff}}$) as power laws in $H$ and $L$:
-
-| Dataset | Scaling Law | $R^2_{\text{adj}}$ |
-|---------|------------|:---:|
-| sklearn digits | $K_0 = 0.089 \cdot H^{0.65} \cdot L^{0.90}$ | 0.95 |
-| sklearn digits | $g = 0.127 \cdot H^{0.37} \cdot L^{0.13}$ | 0.84 |
-| CIFAR-10 | $K_0 = 1.21 \cdot H^{0.98} \cdot L^{-0.03}$ | 0.99 |
-| CIFAR-10 | $\beta = 1.98 \cdot H^{-1.14} \cdot L^{1.90}$ | 0.96 |
-
-The near-linear scaling $K_0 \propto H^{0.98}$ on CIFAR-10 means the critical fraction $K_0/H$ is roughly constant around 1.03, so you always need almost all neurons to recover accuracy on a harder task. On sklearn digits the sub-linear exponent (0.65) shows that wider networks become relatively more compressible.
+The width exponent $\alpha \in [-0.43, -0.31]$ is consistently negative — wider networks are more compressible — and the depth exponent $\gamma \in [0.49, 0.77]$ is consistently positive. These signs match the layered mean-field prediction $p_c \sim L/H$ from the toy model.
 
 <p align="center">
-  <img src="assets/mnist_figures/k0_scaling.png" width="85%" alt="sklearn digits K0 scaling laws"/>
+  <img src="unstructured_pruning/figures/unstructured_figures_mnist28_wanda/scaling_curves.png" width="90%" alt="MNIST-28 unstructured WANDA scaling curves"/>
+  <br/>
+  <em>Recovery curves $A(s)$ for MNIST-28 with WANDA pruning across the $(H, L)$ grid.</em>
 </p>
 
 <p align="center">
-  <img src="assets/cifar/cifar_scaling_laws.png" width="85%" alt="CIFAR-10 scaling laws"/>
-</p>
-
-### Unstructured Pruning
-
-We extended the framework to weight-level (unstructured) pruning with three methods:
-
-- **Random** - Bernoulli masks with keep-probability $s$, averaged over 3 seeds
-- **Magnitude** - keep top-$s$ fraction of weights by $|W_{ij}|$ per layer
-- **WANDA** - per-row score $|W_{ij}| \cdot \|X_j\|_2$, following [Sun et al. 2023](https://arxiv.org/abs/2306.11695)
-
-Experiments run on four datasets to cover a range of input dimensions:
-
-| Dataset | Input dim | Architecture grid |
-|---------|-----------|-------------------|
-| sklearn digits | 64 | $H \in \{8,16,24,32,48,56,64,96\}$, $L \in \{1,2,3,4,5,7,8,10\}$ |
-| MNIST 28x28 | 784 | $H \in \{64,128,256,512\}$, $L \in \{2,3,5,7,10\}$ |
-| CIFAR-10 + PCA(200) | 200 | $H \in \{64,128,256,512\}$, $L \in \{2,3,5,7,10\}$ |
-| CIFAR-10 + ResNet18 | 512 | $H \in \{64,128,256,512\}$, $L \in \{2,3,5,7,10\}$ |
-
-The same sigmoid transition appears in accuracy vs weight density $s$, and $s_0$ follows power laws in architecture:
-
-WANDA unstructured pruning scaling laws across all four datasets:
-
-| Dataset | Scaling Law | $R^2_{\text{adj}}$ |
-|---------|------------|:---:|
-| sklearn digits | $s_0 = 0.247 \cdot H^{-0.35} \cdot L^{0.76}$ | 0.90 |
-| MNIST 28x28 | $s_0 = 0.360 \cdot H^{-0.47} \cdot L^{0.69}$ | 0.92 |
-| CIFAR-10 + PCA(200) | $s_0 = 0.302 \cdot H^{-0.29} \cdot L^{0.60}$ | 0.87 |
-| CIFAR-10 + ResNet18 | $s_0 = 0.257 \cdot H^{-0.35} \cdot L^{0.54}$ | 0.94 |
-
-The width exponent is consistently negative ($\alpha \approx -0.3$ to $-0.5$), so wider networks achieve their critical recovery at a smaller weight fraction — more parameters provide more redundant paths. The depth exponent is positive ($\gamma \approx 0.5$-$0.8$), meaning deeper networks need a larger density to recover.
-
-<p align="center">
-  <img src="assets/mnist28_figures/mnist28_scaling_curves.png" width="85%" alt="MNIST 28x28 unstructured scaling curves"/>
+  <img src="unstructured_pruning/figures/unstructured_figures_cifar_resnet_wanda/scaling_curves.png" width="90%" alt="CIFAR-ResNet18 unstructured WANDA scaling curves"/>
+  <br/>
+  <em>Same on CIFAR-10 with frozen ResNet18 features.</em>
 </p>
 
 <p align="center">
-  <img src="assets/mnist28_figures/mnist28_k0_scaling.png" width="85%" alt="MNIST 28x28 s0 scaling law"/>
+  <img src="unstructured_pruning/figures/unstructured_figures_mnist28_wanda/s0_3d.png" width="80%" alt="MNIST-28 s0 manifold"/>
+  <br/>
+  <em>$s_0(H, L)$ as a fitted manifold over the $H \times L$ grid (MNIST-28, WANDA).</em>
 </p>
+
+### 2. Critical line under inference-time bond disorder (`temperature_pruning/`)
+
+The diluted Curie–Weiss toy model predicts $p_c(T) = T / J_0$, a strictly linear critical line through the origin. To test this we sweep an additive Gaussian weight perturbation
+
+$$W_{ij}^{(\ell)} \;\to\; W_{ij}^{(\ell)} + \varepsilon_{ij}^{(\ell)}, \qquad \varepsilon \sim \mathcal{N}\!\bigl(0,\, \sigma^2\,\mathrm{rms}(W^{(\ell)})^2\bigr),$$
+
+on $100$ values of $\sigma \in [0, 1]$ jointly with the random-pruning density grid, on already-trained checkpoints from `unstructured_pruning/`. The empirical critical lines across all three benchmark datasets are well-described, **inside the F regime**, by a quadratic with vanishing linear term:
+
+$$p_c(\sigma) = a + b\,\sigma + c\,\sigma^2, \qquad b \approx 0, \quad c > 0.$$
+
+This is the **Sherrington–Kirkpatrick bond-disorder** prediction $p_c(\sigma) = T_0/J_0 + \sigma^2/(2 J_0^2)$, with the noise knob identified as the SK disorder amplitude $J_1$ rather than a Boltzmann temperature.
+
+**F-regime restriction.** The SK derivation is valid only in the ferromagnetic regime $J_0 > J_1$; beyond the F→SG line the order parameter switches from magnetisation $m$ to the Edwards–Anderson $q$ and the parabolic ansatz breaks down. We restrict the fit to the F regime by a data-driven rule: bootstrap the parabola on $\sigma \le 0.3$, walk outward, and stop when the running $R^2$ drops more than $0.01$ below the bootstrap value. **9 of 27 cells** trigger the cutoff inside $\sigma \in [0, 1]$ — all of them at the largest depths $L \in \{5, 7\}$, consistent with deeper networks accumulating disorder faster and crossing the SK F→SG line at smaller $\sigma$. In every triggering cell the empirical breakdown $\sigma_\text{cutoff}$ tracks $J_0^\text{eff} = 1/\sqrt{2c}$ to within $\pm 0.1$, a non-trivial second confirmation of the SK picture.
+
+<p align="center">
+  <img src="temperature_pruning/figures/mnist28/critical_line.png" width="92%" alt="MNIST-28 critical line under bond disorder"/>
+  <br/>
+  <em>Empirical critical line $p_c(\sigma)$ on MNIST-28×28 across nine $(H, L)$ cells. Blue: F-regime data used in the fit. Grey crosses + shaded region: SG/thermalisation regime excluded from the fit. Red: quadratic fit. Only $H=128, L=7$ (top-right) shows a clear F→SG breakdown within $\sigma \in [0, 1]$, at $\sigma_\text{cutoff} = 0.85$.</em>
+</p>
+
+<p align="center">
+  <img src="temperature_pruning/figures/cifar_resnet/critical_line.png" width="92%" alt="CIFAR-ResNet critical line under bond disorder"/>
+  <br/>
+  <em>Same on CIFAR-10 with frozen ResNet18 features. Four of nine cells show an SG/thermalisation regime within the swept range — every $L=7$ cell plus $H=160, L=5$.</em>
+</p>
+
+The fit returns direct estimates of the effective coupling $J_0^\text{eff} = 1/\sqrt{2c}$ and the operating temperature $T_0 = a \cdot J_0^\text{eff}$. Representative values:
+
+| Cell | $a$ | $c$ | $J_0^\text{eff}$ | $T_0$ | $\sigma_\text{cutoff}$ |
+|---|:---:|:---:|:---:|:---:|:---:|
+| sklearn-digits $H{=}64$, $L{=}3$ | 0.503 | 0.422 | 1.09 | 0.55 | — |
+| MNIST $H{=}192$, $L{=}5$         | 0.466 | 0.317 | 1.26 | 0.59 | — |
+| CIFAR-ResNet $H{=}192$, $L{=}3$  | 0.381 | 0.454 | 1.05 | 0.40 | — |
+| sklearn-digits $H{=}32$, $L{=}5$ | 0.756 | 0.863 | 0.76 | 0.58 | 0.65 |
+| MNIST $H{=}128$, $L{=}7$         | 0.611 | 0.497 | 1.00 | 0.61 | 0.85 |
+| CIFAR-ResNet $H{=}192$, $L{=}7$  | 0.638 | 0.401 | 1.12 | 0.71 | 0.47 |
+
+Across the full 27-cell grid the medians are $\langle J_0^\text{eff}\rangle \approx 1.13$ and $\langle T_0 \rangle \approx 0.57$, with $T_0$ falling in $[0.40, 0.85]$ — a roughly universal effective inference temperature for random-pruned MLPs despite order-of-magnitude differences in input dimension. The non-zero intercept $a > 0$ packages three contributions into a single empirical thermometer:
+
+1. The **random-pruning structural floor** (dropping high-magnitude weights at random has a cost even at $\sigma = 0$).
+2. The **heterogeneous-trained-weights** mismatch with the uniform-coupling toy model.
+3. The **finite-$D$ + finite-$L$** corrections from sample-complexity ($T_\text{ERM} = T_\star/D$) and saddle rounding ($\delta T_c \sim L^{-1/2}$).
+
+<p align="center">
+  <img src="temperature_pruning/figures/mnist28/accuracy_curves.png" width="92%" alt="MNIST-28 accuracy curves across sigma"/>
+  <br/>
+  <em>Recovery curves $A(s; \sigma)$ for MNIST-28 across the full 100-point $\sigma$ grid; colour encodes $\sigma$.</em>
+</p>
+
+For the theory background of the SK-with-bond-disorder model and what the parabolic critical line tells us, see [`docs/sherrington_kirkpatrick.md`](docs/sherrington_kirkpatrick.md).
 
 ---
 
 ## Framework Validated On
 
-| Scale | Models | Pruning | Metric |
-|-------|--------|---------|--------|
-| FC (structured) | $H \times L$ grid on sklearn digits / CIFAR-10 | Signal, Weight, WANDA, Taylor, Random | Accuracy |
-| FC (unstructured) | $H \times L$ grid on 4 datasets | Random, Magnitude, WANDA | Accuracy |
-| Pythia family | 14M, 70M, 160M, 410M, 1B, 1.4B, 2.8B, 6.9B | WANDA (MLP neurons) | Perplexity |
-| Mixed LLMs | TinyLlama-1.1B, Qwen2.5-0.5B, SmolLM2-1.7B | Top-K activation sparsity | Loss / Perplexity |
+| Scale | Models | Pruning | Metric | Module |
+|---|---|---|---|---|
+| FC unstructured | $H \times L$ grid on 4 datasets | random / magnitude / WANDA | accuracy | `unstructured_pruning/` |
+| FC + inference-time disorder | $H \times L$ grid on 3 datasets | random + Gaussian weight noise | accuracy | `temperature_pruning/` |
+| FC structured (legacy) | $H \times L$ on sklearn / CIFAR | signal / weight / WANDA / Taylor / random | accuracy | `pruning/` |
+| Pythia transformer family | 14M–6.9B | WANDA on MLP neurons | perplexity | `pruning/Pythia_test.ipynb` |
+| Mixed open-source LLMs | TinyLlama-1.1B, Qwen2.5-0.5B, SmolLM2-1.7B | top-K activation sparsity | loss / perplexity | `pruning/LLM_pruning_test.ipynb` |
 
 ---
 
 ## Repository Structure
 
 ```
-pruning/
-  pruning.py              Core library: FCNetwork, pruning methods, sigmoid fitting
-  mnist_scaling.py        sklearn digits scaling scan (H x L grid, saves checkpoints)
-  cifar_scaling.py        CIFAR-10 structured scaling laws (WANDA pruning)
-  mnist28_scaling.py      MNIST 28x28 scaling scan
-  Pythia_test.ipynb       Pythia LLM family: WANDA pruning + scaling laws
-  LLM_pruning_test.ipynb  Mixed LLMs: susceptibility + data collapse
-  test.py                 Unit tests
+unstructured_pruning/        Main results: weight-level pruning across 4 datasets
+  core.py                      shared (H, L) grid runner — train, mask, fit, plot
+  methods.py                   random_masks, magnitude_masks, wanda_masks
+  {sklearn,mnist28,cifar,cifar_resnet}_scaling.py
+                               thin per-dataset wrappers over core
+  loss_scaling.py              cross-entropy-based scaling diagnostics
+  param_scaling.py             critical density vs total parameter count
+  plot_3d_scaling.py           3D manifold renderer for s_0(H, L)
+  figures/                     per-dataset PNGs + JSON results
+  checkpoints/                 trained model checkpoints (one per (H, L, repeat))
 
-unstructured_pruning/
-  core.py                 Shared runner: train, mask, fit sigmoid, fit scaling law, plot
-  methods.py              random_masks, magnitude_masks, wanda_masks
-  mnist_scaling.py        sklearn digits (thin wrapper over core)
-  mnist28_scaling.py      MNIST 28x28
-  cifar_scaling.py        CIFAR-10 + PCA(200)
-  cifar_resnet_scaling.py CIFAR-10 + frozen ResNet18 features (512-d)
+temperature_pruning/         Empirical test of the SK-with-bond-disorder critical line
+  noise.py                     Gaussian weight-noise temperature knob (per-layer RMS-scaled)
+  core.py                      (sigma, density) sweep runner with resumable JSON output
+  analysis.py                  per-cell quadratic fit + data-collapse diagnostic
+  plots.py                     accuracy curves, critical line, data collapse
+  main.py                      argparse driver with per-dataset registry
+  figures/                     critical_line / accuracy_curves / data_collapse per dataset
 
-u_scripts/
-  unstructured.sbatch     SLURM batch script parameterized by DATASET and METHOD
-  submit.sh               Submits all 12 jobs (4 datasets x 3 methods) to ALICE HPC
+pruning/                     Legacy structured pruning + LLM notebooks
+  pruning.py                   FCNetwork class, sigmoid_fit, path-tracing engine
+  {mnist,mnist28,cifar,pythia}_scaling.py
+  Pythia_test.ipynb            transformer scaling laws across the Pythia family
+  LLM_pruning_test.ipynb       mixed-LLM susceptibility + data collapse
+  test.py                      unit tests
 
-assets/                   Committed reference figures and result JSONs
+docs/paper/                  IsingPruning.tex + IsingPruning.pdf (theory writeup)
+u_scripts/                   SLURM batch scripts for ALICE HPC
+assets/                      Cross-cutting reference figures used in the paper
 ```
 
-### Core Library (`pruning/pruning.py`)
+---
 
-- **`FCNetwork`** - PyTorch FC-ReLU network, float64 throughout, Adam optimizer, He init, per-instance seeding
-- **Five structured pruning methods** (precomputed as column/neuron masks):
-  - `signal` - Dynamic $|W \cdot x|$ magnitude (input-dependent)
-  - `weight` - Static weight-magnitude ranking
-  - `wanda` - WANDA ($|W| \times \|x\|$, [Sun et al. 2023](https://arxiv.org/abs/2306.11695))
-  - `taylor` - First-order Taylor sensitivity ($|\nabla_W \cdot W|$)
-  - `random` - Uniform random baseline
-- **`fit_sigmoid`** - Scipy curve-fit with adjusted $R^2$ (n-p denominator)
-- **`evaluate_path_accuracy`** - Batched K-sweep path-tracing engine
+## Quick Start
 
-### Unstructured Pruning (`unstructured_pruning/`)
+**Unstructured pruning sweep (main results):**
+```bash
+python -m unstructured_pruning.mnist28_scaling --method wanda
+python -m unstructured_pruning.cifar_resnet_scaling --method wanda
+# outputs to unstructured_pruning/figures/unstructured_figures_<dataset>_<method>/
+```
 
-`core.py` contains the shared experiment runner (`run_scaling_experiment`) used by all four dataset scripts. It trains the architecture grid, computes weight-level masks at a range of densities, fits the sigmoid recovery curve per configuration, fits joint power-law scaling, and saves figures and JSONs.
+**Temperature/bond-disorder critical-line sweep (uses the trained checkpoints from above):**
+```bash
+python -m temperature_pruning.main --dataset sklearn       # ~70 s
+python -m temperature_pruning.main --dataset mnist28       # ~6 min
+python -m temperature_pruning.main --dataset cifar_resnet  # ~4 min after feature extraction
+# outputs to temperature_pruning/figures/<dataset>/
+```
 
-`methods.py` implements the three mask strategies. Random masks are averaged over 3 seeds since they are stochastic. Magnitude and WANDA masks are deterministic so they use a single seed.
+**Re-render plots only from existing JSON:**
+```bash
+python -m temperature_pruning.main --dataset mnist28 --analysis-only
+```
 
-### Scaling Scripts
+**Submit the full unstructured grid to ALICE HPC (4 datasets × 3 methods):**
+```bash
+bash u_scripts/submit.sh
+DATASETS="sklearn mnist28" METHODS="magnitude wanda" bash u_scripts/submit.sh
+```
 
-`pruning/mnist_scaling.py` now saves all trained model checkpoints to `mnist_figures/checkpoints.pt` as a dict keyed by `(H, L)`, with embedded architecture metadata, so checkpoints can be shared and loaded without re-running the scan:
-
+**Use as a library:**
 ```python
-ckpts = torch.load('mnist_figures/checkpoints.pt')
-arch  = ckpts[(32, 3)]['arch']   # {'input_size':64, 'hidden_size':32, 'num_hidden_layers':3, ...}
-model = FCNetwork(**arch)
-model.load_state_dict(ckpts[(32, 3)]['state_dict'])
+from unstructured_pruning.core import (
+    load_fc_checkpoint, evaluate_masked_accuracy, DEFAULT_DENSITIES,
+)
+from unstructured_pruning.methods import random_masks
+from temperature_pruning.noise import add_weight_noise
+import numpy as np
+
+model, _ = load_fc_checkpoint(
+    'unstructured_pruning/checkpoints/unstructured_figures_mnist28_random/H192_L5_r2.pt'
+)
+rng = np.random.default_rng(0)
+noisy = add_weight_noise(model, sigma=0.2, rng=rng)
+masks = random_masks(noisy, DEFAULT_DENSITIES, n_seeds=3)
+accs, baseline = evaluate_masked_accuracy(noisy, X_test, y_test, masks)
 ```
-
-### Pythia Notebooks
-
-`Pythia_test.ipynb` extends the framework to transformer MLP layers across the Pythia model family (14M to 6.9B parameters):
-
-1. Collect MLP activation statistics over 128 C4 calibration samples
-2. Compute per-neuron WANDA scores using up/down-projection signals
-3. Sweep $K$ (fraction of $d_{\text{ff}}$ neurons kept) and measure perplexity on WikiText-2
-4. Fit sigmoid and extract $(K_0, \beta)$
-5. Fit joint power-law scaling across the model family
-
-Designed for Google Colab T4 (up to 2.8B); A100 needed for 6.9B.
-
-`LLM_pruning_test.ipynb` tests the phase transition on mixed open-source LLMs with two experiments:
-
-- **Sigmoid recovery**: top-K activation sparsity on MLP down-projection layers
-- **Susceptibility divergence**: loss variance $\chi(K)$ across 10 diverse prompts; a sharp peak at $K_0$ is the signature of a genuine second-order phase transition
-- **Data collapse**: recovery curves for different model sizes collapse onto a universal curve when plotted against $(K - K_0) \cdot d_{\text{ff}}^{1/\nu}$
 
 ---
 
@@ -205,61 +227,23 @@ Designed for Google Colab T4 (up to 2.8B); A100 needed for 6.9B.
 ```bash
 pip install numpy scipy scikit-learn matplotlib torch torchvision
 
-# For LLM experiments (notebooks):
+# Optional: LLM experiments in pruning/
 pip install transformers datasets accelerate
 ```
 
-GPU runtime (Google Colab T4 or better) is recommended for the notebooks. The FC network experiments run fine on CPU.
-
-## Quick Start
-
-**Run sklearn digits scaling laws:**
-```bash
-python pruning/mnist_scaling.py    # outputs to mnist_figures/
-```
-
-**Run unstructured pruning on MNIST 28x28:**
-```bash
-python -m unstructured_pruning.mnist28_scaling --method random
-python -m unstructured_pruning.mnist28_scaling --method magnitude
-python -m unstructured_pruning.mnist28_scaling --method wanda
-```
-
-**Submit all 12 unstructured experiments to ALICE HPC:**
-```bash
-bash u_scripts/submit.sh
-# or a subset:
-DATASETS="sklearn mnist28" METHODS="magnitude wanda" bash u_scripts/submit.sh
-```
-
-**Use as a library:**
-```python
-from pruning.pruning import FCNetwork, precompute_pruning_scores, evaluate_path_accuracy, fit_sigmoid
-
-model = FCNetwork(input_size=64, hidden_size=128, num_hidden_layers=3, num_classes=10)
-model.train_model(X_tr, y_tr, X_val, y_val, epochs=300)
-
-scores = precompute_pruning_scores(model, X_tr, y_tr, methods=['wanda'])
-k_values = list(range(1, 129))
-accs, normal_acc = evaluate_path_accuracy(model, X_te, y_te, k_values, scores['wanda'], 'wanda')
-
-popt, perr, r2 = fit_sigmoid(k_values, accs, normal_acc)
-K_0, beta = popt[2], popt[3]
-```
-
-**LLM experiments:** Open `pruning/Pythia_test.ipynb` or `pruning/LLM_pruning_test.ipynb` in Colab with a GPU runtime.
+The FC and temperature_pruning experiments run fine on CPU. GPU recommended only for the LLM notebooks.
 
 ---
 
 ## References
 
 - [Information Flow Through Neural Networks](https://arxiv.org/pdf/1712.00003) (2017)
-- [The Lottery Ticket Hypothesis](https://arxiv.org/abs/1803.03635) (Frankle & Carlin, 2018)
+- [The Lottery Ticket Hypothesis](https://arxiv.org/abs/1803.03635) (Frankle & Carbin, 2018)
 - [WANDA: Pruning by Weights and Activations](https://arxiv.org/abs/2306.11695) (Sun et al., 2023)
-- [Phase Transitions in LLMs and O(N)](https://arxiv.org/pdf/2501.16241) (2025)
+- [Phase diagrams for dilute spin glasses](https://doi.org/10.1088/0022-3719/18/15/013) (Viana & Bray, 1985)
 - [Phase Transitions in Neural Network Pruning](https://arxiv.org/pdf/2602.15224) (2026)
 - [Phase Transitions in LLMs](https://www.nature.com/articles/s44387-026-00072-8) (Nature, 2026)
 
 ## License
 
-[MIT](LICENSE) - Chris Chalkias, 2026
+[MIT](LICENSE) — Chris Chalkias, 2026

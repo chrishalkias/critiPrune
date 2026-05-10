@@ -226,13 +226,16 @@ def main():
     if fits:
         any_fit = next(iter(fits.values()))
         deg = any_fit.get('degree', 1)
+        any_restricted = any(f.get('restricted', False) for f in fits.values())
         if deg == 2:
             header = "p_c = a + b*sigma + c*sigma^2"
         elif deg == 1:
             header = "p_c = a + b*sigma"
         else:
             header = f"p_c = polynomial degree {deg}"
-        print(f"\n  Critical-line fits  {header}:")
+        scope = ("F-regime restricted (per cell)" if any_restricted
+                 else "no truncation: F regime extends past data")
+        print(f"\n  Critical-line fits  {header}  [{scope}]:")
         for (H, L), f in sorted(fits.items()):
             parts = [f"H={H} L={L}:"]
             for i, c in enumerate(f['coeffs']):
@@ -240,6 +243,12 @@ def main():
                 se = f['coeffs_se'][i]
                 parts.append(f"{name}={c:+.4f} +/- {se:.4f}")
             parts.append(f"R2={f['R2']:.3f}  n={f['n']}")
+            if 'J0_eff_iter' in f and f['J0_eff_iter'] is not None:
+                parts.append(f"J0={f['J0_eff_iter']:.2f}")
+            if f.get('restricted'):
+                fmax = f.get('sigma_fit_max', f.get('sigma_cutoff'))
+                cutoff = f.get('sigma_cutoff')
+                parts.append(f"fit_window<= {fmax:.2f}  SG_line={cutoff:.2f}")
             print("    " + "  ".join(parts))
 
 

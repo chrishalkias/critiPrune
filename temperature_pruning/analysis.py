@@ -91,16 +91,124 @@ def _poly_fit(x, y, degree=2):
     return out
 
 
-def fit_critical_line(pc_by_cell, degree=2):
+def _J0_from_curvature(coeffs):
+    """Extract J_0_eff = 1/sqrt(2c) from a degree->=2 polynomial fit.
+
+    Returns ``None`` when the curvature ``c`` is non-positive (degenerate
+    fit, no F-regime interpretation).
+    """
+    if len(coeffs) < 3:
+        return None
+    c = coeffs[2]
+    if c <= 0:
+        return None
+    return 1.0 / np.sqrt(2.0 * c)
+
+
+def _residual_based_F_regime_fit(sigmas, p_cs, degree=2,
+                                 initial_sigma_max=0.3,
+                                 R2_drop_tol=0.01,
+                                 min_points=4):
+    """Data-driven F -> SG / thermalisation cutoff via running R^2.
+
+    We walk outward in sigma starting from the bootstrap window
+    sigma <= ``initial_sigma_max``. After each candidate extension we
+    refit the polynomial and check the resulting R^2:
+
+        - Accept the new point as long as R^2 has not dropped more than
+          ``R2_drop_tol`` below the *bootstrap* R^2 (the in-window fit
+          quality at sigma <= ``initial_sigma_max``).
+        - Otherwise, the previous sigma is declared the F -> SG /
+          thermalisation boundary and we stop.
+
+    Anchoring against the bootstrap R^2 (rather than an absolute floor or
+    the running maximum) is forgiving for cells that are intrinsically
+    noisy in the F regime and decisive for cells where the curve cleanly
+    breaks down at large sigma.
+
+    Returned fields
+    ---------------
+    ``sigma_cutoff``   -- empirical F regime boundary (used for plotting).
+    ``sigma_fit_max``  -- alias for ``sigma_cutoff`` (fit window == cutoff
+                          here by construction).
+    ``J0_eff_iter``    -- J_0 = 1 / sqrt(2 c) from the truncated fit.
+    ``restricted``     -- True if at least one point was excluded.
+    ``n_iters``        -- number of points beyond the bootstrap that were
+                          successfully appended.
+    """
+    sigmas = np.asarray(sigmas, dtype=float)
+    p_cs = np.asarray(p_cs, dtype=float)
+    sigma_max_data = float(sigmas.max())
+
+    order = np.argsort(sigmas)
+    sigmas_s = sigmas[order]
+    p_cs_s = p_cs[order]
+    n_total = len(sigmas_s)
+
+    full_fit = _poly_fit(sigmas, p_cs, degree=degree)
+    if full_fit is None:
+        return None
+    full_fit['sigma_fit_max'] = sigma_max_data
+    full_fit['sigma_cutoff'] = sigma_max_data
+    full_fit['J0_eff_iter'] = _J0_from_curvature(full_fit['coeffs'])
+    full_fit['restricted'] = False
+    full_fit['n_iters'] = 0
+
+    init_count = int((sigmas_s <= initial_sigma_max + 1e-9).sum())
+    init_count = max(init_count, min_points)
+    if init_count >= n_total:
+        return full_fit
+
+    cur_fit = _poly_fit(sigmas_s[:init_count], p_cs_s[:init_count],
+                        degree=degree)
+    if cur_fit is None:
+        return full_fit
+
+    R2_boot = float(cur_fit['R2']) if cur_fit['R2'] == cur_fit['R2'] else 1.0
+    R2_threshold = R2_boot - R2_drop_tol
+    n_used = init_count
+    n_accepted = 0
+
+    for i in range(init_count, n_total):
+        candidate = _poly_fit(sigmas_s[:i + 1], p_cs_s[:i + 1],
+                              degree=degree)
+        if candidate is None:
+            break
+        r2 = float(candidate['R2']) if candidate['R2'] == candidate['R2'] else 0.0
+        if r2 < R2_threshold:
+            break
+        cur_fit = candidate
+        n_used = i + 1
+        n_accepted += 1
+
+    if n_used == n_total:
+        full_fit['J0_eff_iter'] = _J0_from_curvature(cur_fit['coeffs'])
+        return full_fit
+
+    cutoff = float(sigmas_s[n_used - 1])
+    cur_fit['sigma_fit_max'] = cutoff
+    cur_fit['sigma_cutoff'] = cutoff
+    cur_fit['J0_eff_iter'] = _J0_from_curvature(cur_fit['coeffs'])
+    cur_fit['restricted'] = True
+    cur_fit['n_iters'] = int(n_accepted)
+    return cur_fit
+
+
+def fit_critical_line(pc_by_cell, degree=2,
+                      restrict_to_F_regime=True,
+                      initial_sigma_max=0.3):
     """Per (H, L) polynomial fit p_c(sigma) = a + b sigma + c sigma^2 + ...
 
-    The diluted Curie-Weiss model predicts a strict linear ``p_c = T/J_0``;
-    empirical curves often look parabolic at finite size, so a degree-2 fit
-    captures both the linear slope and the leading curvature.
+    By default the fit is restricted to the SK ferromagnetic regime
+    sigma <= J_0_eff, with J_0_eff iteratively self-consistent with the
+    fitted curvature. Set ``restrict_to_F_regime=False`` to fit the full
+    sigma range.
 
     Returns
     -------
-    dict {(H, L): {coeffs, coeffs_se, R2, n, degree, a, b, c, ..., sigmas, p_cs}}
+    dict {(H, L): {coeffs, coeffs_se, R2, n, degree, a, b, c, ...,
+                   sigmas, p_cs, sigma_cutoff, J0_eff_iter, restricted,
+                   n_iters}}
     """
     out = {}
     for (H, L), entries in pc_by_cell.items():
@@ -111,7 +219,18 @@ def fit_critical_line(pc_by_cell, degree=2):
         p_cs = [float(np.mean(by_sigma[s])) for s in sigmas]
         if len(sigmas) <= degree:
             continue
-        fit = _poly_fit(sigmas, p_cs, degree=degree)
+        if restrict_to_F_regime:
+            fit = _residual_based_F_regime_fit(
+                sigmas, p_cs, degree=degree,
+                initial_sigma_max=initial_sigma_max,
+            )
+        else:
+            fit = _poly_fit(sigmas, p_cs, degree=degree)
+            if fit is not None:
+                fit['sigma_cutoff'] = float(sigmas[-1])
+                fit['J0_eff_iter'] = _J0_from_curvature(fit['coeffs'])
+                fit['restricted'] = False
+                fit['n_iters'] = 0
         if fit is None:
             continue
         fit['sigmas'] = list(sigmas)

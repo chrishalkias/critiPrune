@@ -23,6 +23,35 @@ from pruning.pruning import sigmoid_fn
 from .analysis import collapse_score, fit_critical_line, group_pc_by_cell
 
 
+# Enable LaTeX rendering for all text and equations. Falls back gracefully
+# to mathtext if a TeX installation is not available at run time -- the
+# fallback is set up by reading TEMPERATURE_PRUNING_NOTEX, which CI / users
+# without LaTeX can flip on.
+def _enable_latex_rendering():
+    import os
+    if os.environ.get('TEMPERATURE_PRUNING_NOTEX'):
+        return False
+    try:
+        plt.rcParams.update({
+            'text.usetex': True,
+            'font.family': 'serif',
+            'font.serif': ['Computer Modern Roman'],
+            'axes.labelsize': 11,
+            'axes.titlesize': 11,
+            'legend.fontsize': 8,
+            'xtick.labelsize': 9,
+            'ytick.labelsize': 9,
+            'figure.titlesize': 12,
+            'text.latex.preamble': r'\usepackage{amsmath}\usepackage{amssymb}',
+        })
+        return True
+    except Exception:
+        return False
+
+
+_USETEX = _enable_latex_rendering()
+
+
 def _cell_grid(cells, n_cols=3):
     n = len(cells)
     n_cols = max(1, min(n_cols, n))
@@ -93,7 +122,7 @@ def plot_accuracy_curves(results, output_path, min_r2=0.0):
                 ax.plot(s_fine, fit, color=color, lw=0.9, alpha=0.8)
         ax.set_title(f'H={H}, L={L}')
         ax.set_xlabel('Density $s$')
-        ax.set_ylabel('Accuracy (%)')
+        ax.set_ylabel(r'Accuracy (\%)')
         ax.grid(alpha=0.3)
 
     for j in range(len(cells), n_rows * n_cols):
@@ -127,50 +156,71 @@ def plot_critical_line(results, output_path, min_r2=0.80):
         f = fits[cell]
         sigmas = np.array(f['sigmas'])
         p_cs = np.array(f['p_cs'])
-        ax.scatter(sigmas, p_cs, s=30, color='C0', zorder=5,
-                   edgecolor='black', linewidth=0.5)
-        # Polynomial fit curve, evaluated on a fine grid.
-        x_line = np.linspace(0, sigmas.max() * 1.05, 200)
-        # f['coeffs'] is ascending [c0, c1, c2, ...]; np.polyval expects
-        # highest-degree-first, so reverse.
+        cutoff = float(f.get('sigma_cutoff', sigmas.max()))
+        in_F = sigmas <= cutoff + 1e-9
+        sigma_max = float(sigmas.max())
+        # Shade the SG / thermalisation region first so it sits below the data.
+        if cutoff < sigma_max:
+            ax.axvspan(cutoff, sigma_max * 1.05,
+                       facecolor='lightgray', alpha=0.35, zorder=0)
+            ax.axvline(cutoff, color='dimgray', ls='--', lw=1.1,
+                       alpha=0.85, zorder=1)
+        # Points used in the (truncated) fit
+        ax.scatter(sigmas[in_F], p_cs[in_F], s=30, color='C0', zorder=5,
+                   edgecolor='black', linewidth=0.5,
+                   label='F-regime data (fit)')
+        # Points outside the F regime, drawn faintly
+        if (~in_F).any():
+            ax.scatter(sigmas[~in_F], p_cs[~in_F], s=20, color='gray',
+                       zorder=4, alpha=0.55, marker='x',
+                       label=f'$\\sigma > J_0^{{\\rm eff}}$ (excluded)')
+        # Polynomial fit curve, drawn only over the F regime where it was fit.
+        x_line = np.linspace(0, cutoff * 1.02, 200)
         y_line = np.polyval(list(reversed(f['coeffs'])), x_line)
         deg = f['degree']
+        J0_str = ''
+        if f.get('J0_eff_iter') is not None and np.isfinite(f['J0_eff_iter']):
+            J0_str = f"  $J_0^{{\\rm eff}}={f['J0_eff_iter']:.2f}$"
         if deg == 2:
             label = (f"$p_c = {f['a']:.3f} + {f['b']:.3f}\\,\\sigma + "
                      f"{f['c']:.3f}\\,\\sigma^2$\n"
-                     f"$R^2={f['R2']:.3f}$")
+                     f"$R^2={f['R2']:.3f}$  $n={f['n']}${J0_str}")
         elif deg == 1:
             label = (f"$p_c = {f['a']:.3f} + {f['b']:.3f}\\,\\sigma$\n"
-                     f"$R^2={f['R2']:.3f}$  $1/J_0={f['b']:.2f}$")
+                     f"$R^2={f['R2']:.3f}$  $n={f['n']}${J0_str}")
         else:
             terms = [f"{c:+.3f}\\sigma^{{{i}}}" if i > 1 else
                      (f"{c:+.3f}\\sigma" if i == 1 else f"{c:.3f}")
                      for i, c in enumerate(f['coeffs'])]
-            label = f"$p_c = {' '.join(terms)}$\n$R^2={f['R2']:.3f}$"
+            label = (f"$p_c = {' '.join(terms)}$\n"
+                     f"$R^2={f['R2']:.3f}$  $n={f['n']}${J0_str}")
         ax.plot(x_line, y_line, 'r-', lw=1.5, label=label)
         ax.axhline(0, color='gray', lw=0.5)
         ax.set_title(f'H={H}, L={L}')
         ax.set_xlabel('Temperature $\\sigma$')
         ax.set_ylabel('$p_c$ (sigmoid inflection)')
-        ax.legend(fontsize=8, loc='upper left')
+        ax.legend(fontsize=7, loc='upper left')
         ax.grid(alpha=0.3)
 
     for j in range(len(cells), n_rows * n_cols):
         axes[j // n_cols][j % n_cols].set_visible(False)
 
-    deg = next(iter(fits.values()))['degree']
+    any_fit = next(iter(fits.values()))
+    deg = any_fit['degree']
+    any_restricted = any(f.get('restricted', False) for f in fits.values())
+    suffix = (r"  (fit restricted to F regime $\sigma \leq J_0^{\rm eff}$)"
+              if any_restricted else "")
     if deg == 2:
         title = (r"Critical line $p_c(\sigma) = a + b\,\sigma + c\,\sigma^2$"
-                 "\n"
+                 + suffix + "\n"
                  r"Sherrington-Kirkpatrick bond-disorder prediction: "
                  r"$p_c = T_0/J_0 + \sigma^2/(2 J_0^2)$  "
                  r"(i.e. $b=0$, $c=1/(2J_0^2)$)")
     elif deg == 1:
-        title = (r"Critical line $p_c(\sigma) = a + b\,\sigma$"
-                 "\n"
-                 r"diluted Curie-Weiss prediction: linear with $b=1/J_0$")
+        title = (r"Critical line $p_c(\sigma) = a + b\,\sigma$" + suffix
+                 + "\n" r"diluted Curie-Weiss prediction: linear with $b=1/J_0$")
     else:
-        title = r"$p_c(\sigma)$ polynomial fit"
+        title = r"$p_c(\sigma)$ polynomial fit" + suffix
     fig.suptitle(title, fontsize=11, y=1.0)
     fig.tight_layout()
     fig.savefig(output_path, dpi=240, bbox_inches='tight')
@@ -222,7 +272,7 @@ def plot_data_collapse(results, output_path, min_r2=0.80):
                               fc='white', alpha=0.85))
         ax.set_xscale('log')
         ax.set_xlabel(r'$s / \sigma$  (rescaled density)')
-        ax.set_ylabel('Accuracy (%)')
+        ax.set_ylabel(r'Accuracy (\%)')
         ax.set_title(f'H={H}, L={L}')
         ax.grid(alpha=0.3, which='both')
 
