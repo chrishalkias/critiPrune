@@ -146,6 +146,10 @@ def parse_args():
                    help='Which checkpoint repeats (default: per-dataset).')
     p.add_argument('--n-mask-seeds', type=int, default=3)
     p.add_argument('--n-noise-seeds', type=int, default=3)
+    p.add_argument('--n-trials', type=int, default=1,
+                   help='Independent (noise, mask) bundles per (cell, sigma). '
+                        'Each trial produces one sigmoid fit; the std across '
+                        'trial s_0 values becomes the error bar on p_c(sigma).')
     p.add_argument('--seed', type=int, default=42)
     p.add_argument('--noise-scale', choices=['rms', 'absolute'], default='rms',
                    help='Per-layer RMS-relative or absolute noise std.')
@@ -201,6 +205,7 @@ def main():
             repeat_ids=tuple(args.repeat_ids),
             n_mask_seeds=args.n_mask_seeds,
             n_noise_seeds=args.n_noise_seeds,
+            n_trials=args.n_trials,
             seed=args.seed,
             noise_scale=args.noise_scale,
         )

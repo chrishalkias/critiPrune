@@ -156,24 +156,45 @@ def plot_critical_line(results, output_path, min_r2=0.80):
         f = fits[cell]
         sigmas = np.array(f['sigmas'])
         p_cs = np.array(f['p_cs'])
+        p_cs_std = np.array(f.get('p_cs_std',
+                                   np.zeros_like(p_cs)))
         cutoff = float(f.get('sigma_cutoff', sigmas.max()))
         in_F = sigmas <= cutoff + 1e-9
         sigma_max = float(sigmas.max())
+        has_errors = bool(np.any(p_cs_std > 0))
         # Shade the SG / thermalisation region first so it sits below the data.
         if cutoff < sigma_max:
             ax.axvspan(cutoff, sigma_max * 1.05,
                        facecolor='lightgray', alpha=0.35, zorder=0)
             ax.axvline(cutoff, color='dimgray', ls='--', lw=1.1,
                        alpha=0.85, zorder=1)
-        # Points used in the (truncated) fit
-        ax.scatter(sigmas[in_F], p_cs[in_F], s=30, color='C0', zorder=5,
-                   edgecolor='black', linewidth=0.5,
-                   label='F-regime data (fit)')
-        # Points outside the F regime, drawn faintly
+        # F-regime data: show as error bars if trial std is available,
+        # otherwise plain scatter.
+        f_label = (r'F-regime data (mean $\pm$ std)' if has_errors
+                   else 'F-regime data (fit)')
+        if has_errors:
+            ax.errorbar(sigmas[in_F], p_cs[in_F], yerr=p_cs_std[in_F],
+                        fmt='o', ms=4, color='C0', zorder=5,
+                        ecolor='C0', elinewidth=0.8, capsize=2,
+                        markeredgecolor='black', markeredgewidth=0.4,
+                        label=f_label)
+        else:
+            ax.scatter(sigmas[in_F], p_cs[in_F], s=30, color='C0', zorder=5,
+                       edgecolor='black', linewidth=0.5, label=f_label)
+        # Points outside the F regime, drawn faintly (with error bars too
+        # if available, so the SG region is visually consistent).
         if (~in_F).any():
-            ax.scatter(sigmas[~in_F], p_cs[~in_F], s=20, color='gray',
-                       zorder=4, alpha=0.55, marker='x',
-                       label=f'$\\sigma > J_0^{{\\rm eff}}$ (excluded)')
+            excluded_label = r'$\sigma > J_0^{\rm eff}$ (excluded)'
+            if has_errors:
+                ax.errorbar(sigmas[~in_F], p_cs[~in_F],
+                            yerr=p_cs_std[~in_F],
+                            fmt='x', ms=4, color='gray', zorder=4,
+                            ecolor='gray', elinewidth=0.5, capsize=1.5,
+                            alpha=0.55, label=excluded_label)
+            else:
+                ax.scatter(sigmas[~in_F], p_cs[~in_F], s=20, color='gray',
+                           zorder=4, alpha=0.55, marker='x',
+                           label=excluded_label)
         # Polynomial fit curve, drawn only over the F regime where it was fit.
         x_line = np.linspace(0, cutoff * 1.02, 200)
         y_line = np.polyval(list(reversed(f['coeffs'])), x_line)

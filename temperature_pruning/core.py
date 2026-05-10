@@ -43,36 +43,105 @@ def _aggregate_accs(per_run_accs):
     return {s: (float(np.mean(v)), float(np.std(v))) for s, v in per_run_accs.items()}
 
 
-def _evaluate_one_sigma(model, sigma, X_te, y_te, densities,
-                       n_mask_seeds, n_noise_seeds, base_seed):
-    """Run all (noise seed, mask seed) reps for a single sigma value.
+def _single_trial(model, sigma, X_te, y_te, densities,
+                  n_mask_seeds, n_noise_seeds, trial_seed):
+    """One bundle of (n_noise_seeds * n_mask_seeds) reps for a single sigma.
 
-    Returns
-    -------
-    accs : dict {s: (mean, std)}  -- aggregated over (n_noise_seeds * n_mask_seeds)
-    normal_acc_mean, normal_acc_std : float
-        Unpruned accuracy of the noisy model, averaged over noise seeds.
+    Returns the per-density mean accuracy curve (across the inner bundle)
+    and the resulting sigmoid fit. This is the unit treated as one
+    "trial" when computing error bars across many such bundles.
     """
     per_run = {float(s): [] for s in densities}
     normal_accs = []
 
     for k in range(n_noise_seeds):
-        rng = np.random.default_rng(base_seed + 7919 * k)
+        rng = np.random.default_rng(trial_seed + 7919 * k)
         noisy = add_weight_noise(model, sigma, rng)
-
         mask_sets = random_masks(noisy, densities,
                                  n_seeds=n_mask_seeds,
-                                 base_seed=base_seed + 1009 * k)
+                                 base_seed=trial_seed + 1009 * k)
         accs_stats, normal_acc = evaluate_masked_accuracy(
             noisy, X_te, y_te, mask_sets)
         normal_accs.append(normal_acc)
-        # accs_stats[s] is already a (mean, std) over the n_mask_seeds masks.
-        # We unpack the per-seed mean (the std is recomputed across the full pool).
         for s, (m, _) in accs_stats.items():
             per_run[float(s)].append(m)
 
-    accs = _aggregate_accs(per_run)
-    return accs, float(np.mean(normal_accs)), float(np.std(normal_accs))
+    s_values = sorted(per_run)
+    accs_mean_curve = {s: float(np.mean(per_run[s])) for s in s_values}
+    na_mean = float(np.mean(normal_accs))
+    popt, _perr, r2 = fit_sigmoid(s_values, accs_mean_curve, na_mean)
+    return {
+        'accs_mean': accs_mean_curve,
+        'normal_acc': na_mean,
+        'popt': None if popt is None else [float(x) for x in popt],
+        'R2': None if r2 is None else float(r2),
+    }
+
+
+def _evaluate_one_sigma(model, sigma, X_te, y_te, densities,
+                       n_mask_seeds, n_noise_seeds, base_seed,
+                       n_trials=1):
+    """Run ``n_trials`` independent bundles for one sigma.
+
+    Each trial is a self-contained (noise, mask) experiment with its own
+    seed, sigmoid fit and per-density accuracy curve. With ``n_trials=1``
+    the behaviour is equivalent to the original single-bundle evaluation.
+
+    Returns
+    -------
+    accs : dict {s: (mean, std)}
+        Per-density mean and std *across trials* (the std is what shows
+        up as the inner uncertainty of the accuracy curve).
+    na_mean, na_std : float
+        Unpruned accuracy of the noisy model, averaged across trials.
+    s_0_trials : list of float
+        Per-trial sigmoid inflection (NaN for trials whose fit failed).
+    R2_trials : list of float
+        Per-trial sigmoid R^2.
+    popt_grand : list of float or None
+        ``[A_inf, A_0, s_0, beta]`` from fitting the trial-pooled mean
+        accuracy curve (used as the "display" sigmoid for plotting).
+    R2_grand : float or None
+    """
+    trials = []
+    for t in range(n_trials):
+        trial_seed = base_seed + 1_000_003 * t
+        trials.append(_single_trial(
+            model, sigma, X_te, y_te, densities,
+            n_mask_seeds, n_noise_seeds, trial_seed))
+
+    # Per-density distribution across trials.
+    pool = {float(s): [] for s in densities}
+    nas = []
+    for tr in trials:
+        nas.append(tr['normal_acc'])
+        for s, m in tr['accs_mean'].items():
+            pool[float(s)].append(m)
+    accs = {s: (float(np.mean(v)), float(np.std(v))) for s, v in pool.items()}
+    na_mean = float(np.mean(nas))
+    na_std = float(np.std(nas))
+
+    s_0_trials = []
+    R2_trials = []
+    for tr in trials:
+        if tr['popt'] is None:
+            s_0_trials.append(float('nan'))
+            R2_trials.append(float('nan'))
+        else:
+            s_0_trials.append(float(tr['popt'][2]))
+            R2_trials.append(float(tr['R2']) if tr['R2'] is not None
+                             else float('nan'))
+
+    # "Display" sigmoid: refit on the trial-pooled mean accuracy curve.
+    s_values = sorted(pool)
+    grand_mean_curve = {s: float(np.mean(pool[s])) for s in s_values}
+    popt_grand, _perr, R2_grand = fit_sigmoid(
+        s_values, grand_mean_curve, na_mean)
+    popt_grand_list = (None if popt_grand is None
+                       else [float(x) for x in popt_grand])
+    R2_grand = None if R2_grand is None else float(R2_grand)
+
+    return accs, na_mean, na_std, s_0_trials, R2_trials, popt_grand_list, R2_grand
 
 
 def run_temperature_pruning_experiment(
@@ -87,6 +156,7 @@ def run_temperature_pruning_experiment(
     repeat_ids=(0,),
     n_mask_seeds=3,
     n_noise_seeds=3,
+    n_trials=1,
     seed=42,
     noise_scale='rms',
 ):
@@ -166,16 +236,28 @@ def run_temperature_pruning_experiment(
                         continue
 
                     t0 = time.time()
-                    accs_stats, na_mean, na_std = _evaluate_one_sigma(
+                    (accs_stats, na_mean, na_std,
+                     s_0_trials, R2_trials,
+                     popt_grand, R2_grand) = _evaluate_one_sigma(
                         model, sigma, X_te, y_te, densities,
                         n_mask_seeds=n_mask_seeds,
                         n_noise_seeds=n_noise_seeds,
                         base_seed=base_seed,
+                        n_trials=n_trials,
                     )
 
                     s_values = sorted(accs_stats.keys())
-                    accs_mean = {s: accs_stats[s][0] for s in s_values}
-                    popt, perr, r2 = fit_sigmoid(s_values, accs_mean, na_mean)
+
+                    # Per-trial summary statistics (NaN-safe).
+                    s_0_arr = np.array([x for x in s_0_trials
+                                        if x == x])  # drop NaNs
+                    s_0_mean = (float(np.mean(s_0_arr))
+                                if s_0_arr.size else None)
+                    s_0_std = (float(np.std(s_0_arr))
+                               if s_0_arr.size > 1 else 0.0)
+                    R2_arr = np.array([x for x in R2_trials if x == x])
+                    R2_mean = (float(np.mean(R2_arr))
+                               if R2_arr.size else None)
 
                     row = {
                         'H': int(H), 'L': int(L),
@@ -191,20 +273,32 @@ def run_temperature_pruning_experiment(
                         'accs_std':  [float(accs_stats[s][1]) for s in s_values],
                         'n_mask_seeds': int(n_mask_seeds),
                         'n_noise_seeds': int(n_noise_seeds),
+                        'n_trials': int(n_trials),
+                        'sigmoid_s_0_trials': s_0_trials,
+                        'sigmoid_s_0_std': s_0_std,
+                        'sigmoid_R2_trials': R2_trials,
                     }
-                    if popt is not None:
-                        A_inf, A_0, s_0, beta = popt
+                    # The "display" sigmoid is the fit on the trial-pooled
+                    # mean accuracy curve. Headline s_0 reported here is
+                    # the per-trial mean (more robust than the display fit's
+                    # s_0 because each trial contributes one independent
+                    # estimate).
+                    if popt_grand is not None and s_0_mean is not None:
+                        A_inf, A_0, _s0_grand, beta = popt_grand
                         row.update({
                             'sigmoid_A_inf': float(A_inf),
                             'sigmoid_A_0':   float(A_0),
-                            'sigmoid_s_0':   float(s_0),
+                            'sigmoid_s_0':   float(s_0_mean),
                             'sigmoid_beta':  float(beta),
-                            'sigmoid_R2':    float(r2),
+                            'sigmoid_R2':    float(R2_grand) if R2_grand is not None
+                                             else (R2_mean or float('nan')),
                         })
                         print(f"  [{count}/{total}] H={H} L={L} r={rep} "
-                              f"sigma={sigma:.3f}  s0={s_0:.3f} "
-                              f"R2={r2:.3f}  na={na_mean:.3f}  "
-                              f"[{time.time() - t0:.1f}s]")
+                              f"sigma={sigma:.3f}  "
+                              f"s0={s_0_mean:.3f}+/-{s_0_std:.3f} "
+                              f"R2={R2_grand or R2_mean or float('nan'):.3f}  "
+                              f"na={na_mean:.3f}  "
+                              f"[{time.time() - t0:.1f}s, {n_trials} trial(s)]")
                     else:
                         row['sigmoid_R2'] = None
                         print(f"  [{count}/{total}] H={H} L={L} r={rep} "

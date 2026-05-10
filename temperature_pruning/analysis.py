@@ -24,16 +24,11 @@ import numpy as np
 def group_pc_by_cell(results, min_r2=0.80):
     """Build the per-cell p_c(sigma) table.
 
-    Parameters
-    ----------
-    results : list of dict
-        Output of ``core.run_temperature_pruning_experiment``.
-    min_r2 : float
-        Sigmoid R^2 threshold; rows below this are skipped.
-
     Returns
     -------
-    dict {(H, L): list of (sigma, s_0, beta, R2, repeat)}
+    dict {(H, L): list of (sigma, s_0, s_0_std, beta, R2, repeat)}
+        ``s_0_std`` is the across-trials std when ``n_trials > 1`` was
+        used in the sweep; 0.0 otherwise.
     """
     out = defaultdict(list)
     for r in results:
@@ -44,6 +39,7 @@ def group_pc_by_cell(results, min_r2=0.80):
         out[(int(r['H']), int(r['L']))].append((
             float(r['sigma']),
             float(r['sigmoid_s_0']),
+            float(r.get('sigmoid_s_0_std', 0.0) or 0.0),
             float(r['sigmoid_beta']),
             float(r['sigmoid_R2']),
             int(r['repeat']),
@@ -212,11 +208,23 @@ def fit_critical_line(pc_by_cell, degree=2,
     """
     out = {}
     for (H, L), entries in pc_by_cell.items():
-        by_sigma = defaultdict(list)
-        for (sigma, s0, _beta, _r2, _rep) in entries:
-            by_sigma[float(sigma)].append(s0)
-        sigmas = sorted(by_sigma)
-        p_cs = [float(np.mean(by_sigma[s])) for s in sigmas]
+        by_sigma_vals = defaultdict(list)
+        by_sigma_stds = defaultdict(list)
+        for (sigma, s0, s0_std, _beta, _r2, _rep) in entries:
+            by_sigma_vals[float(sigma)].append(s0)
+            by_sigma_stds[float(sigma)].append(s0_std)
+        sigmas = sorted(by_sigma_vals)
+        p_cs = [float(np.mean(by_sigma_vals[s])) for s in sigmas]
+        # If trials produced an std, prefer that (averaged over repeats);
+        # otherwise fall back to the across-repeats std at this sigma.
+        p_cs_std = []
+        for s in sigmas:
+            trial_stds = [v for v in by_sigma_stds[s] if v > 0]
+            if trial_stds:
+                p_cs_std.append(float(np.mean(trial_stds)))
+            else:
+                vals = by_sigma_vals[s]
+                p_cs_std.append(float(np.std(vals)) if len(vals) > 1 else 0.0)
         if len(sigmas) <= degree:
             continue
         if restrict_to_F_regime:
@@ -235,6 +243,7 @@ def fit_critical_line(pc_by_cell, degree=2,
             continue
         fit['sigmas'] = list(sigmas)
         fit['p_cs'] = p_cs
+        fit['p_cs_std'] = p_cs_std
         out[(H, L)] = fit
     return out
 
