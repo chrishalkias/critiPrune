@@ -24,8 +24,14 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
 
 from .analysis import fit_critical_line, group_pc_by_cell
+
+
+def _gaussian_plus_const(sigma, a, Sigma, b):
+    """beta(sigma) = a * exp(-sigma^2 / Sigma^2) + b."""
+    return a * np.exp(-sigma ** 2 / (Sigma ** 2)) + b
 
 
 # scipy.optimize.curve_fit bound used in the sweep -- beta values at this
@@ -123,6 +129,32 @@ def plot_beta_vs_sigma(results_path, output_path,
                        color=L_colors[L], alpha=0.35, marker='x',
                        zorder=3, label=r'$\sigma > J_0^{\rm eff}$')
 
+        # Gaussian+offset fit beta = a * exp(-sigma^2 / Sigma^2) + b,
+        # restricted to the F regime.
+        if in_F.sum() >= 4 and (betas[in_F] > 0).all():
+            try:
+                s_F = sigmas[in_F]
+                b_F = betas[in_F]
+                p0 = (max(b_F.max() - b_F.min(), 0.1),  # a
+                      max(s_F.max() / 2.0, 0.1),         # Sigma
+                      float(b_F.min()))                  # b
+                bounds = ([0.0, 1e-3, 0.0],
+                          [b_F.max() * 5, s_F.max() * 5,
+                           b_F.max()])
+                popt, _pcov = curve_fit(
+                    _gaussian_plus_const, s_F, b_F,
+                    p0=p0, bounds=bounds, maxfev=10_000)
+                a_fit, Sigma_fit, b_fit = popt
+                x_fit = np.linspace(0.0, cutoff, 200)
+                ax.plot(x_fit, _gaussian_plus_const(x_fit, *popt),
+                        'r--', lw=1.1, alpha=0.9,
+                        label=(fr'$\beta = {a_fit:.1f}\,'
+                               fr'e^{{-\sigma^2/\Sigma^2}} + {b_fit:.1f}$'
+                               '\n'
+                               fr'$\Sigma = {Sigma_fit:.2f}$ (F regime)'))
+            except Exception:
+                pass
+
         ax.set_title(f'$H={H}$, $L={L}$')
         ax.set_xlabel(r'Temperature $\sigma$')
         ax.set_ylabel(r'Sigmoid steepness $\beta$')
@@ -134,9 +166,11 @@ def plot_beta_vs_sigma(results_path, output_path,
 
     if drop_saturated:
         cap_note = (rf'  (dropped $\beta \ge {BETA_CAP:.0f}$ saturated fits;'
-                    rf' $R^2 \ge {min_r2:.2f}$)')
+                    rf' $R^2 \ge {min_r2:.2f}$;'
+                    r' Gaussian+offset fit on F regime only)')
     else:
-        cap_note = rf'  ($R^2 \ge {min_r2:.2f}$)'
+        cap_note = (rf'  ($R^2 \ge {min_r2:.2f}$;'
+                    r' Gaussian+offset fit on F regime only)')
     fig.suptitle(r'Sigmoid steepness $\beta(\sigma)$ vs Gaussian-noise '
                  r'amplitude' + '\n'
                  r'(transition becomes rounder as $\sigma$ grows '
