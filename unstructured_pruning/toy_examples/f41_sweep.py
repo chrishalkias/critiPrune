@@ -67,22 +67,47 @@ def _mnist_loader(data_dir):
     return load_mnist(data_dir)
 
 
-def _cifar_pca_loader(data_dir):
-    """Wrap ``unstructured_pruning.cifar_scaling.load_cifar_pca`` to the
-    four-tuple torch contract used by this sweep. ``data_dir`` is accepted
-    for signature uniformity and currently ignored (the underlying loader
-    caches under ``/tmp/cifar10``)."""
-    del data_dir  # not configurable through the underlying loader
-    from unstructured_pruning.cifar_scaling import load_cifar_pca
-    X_tr, X_val, X_te, y_tr, y_val, y_te = load_cifar_pca()
-    # Fold val back into train: the sweep has no validation concept.
+def _six_tuple_to_four(loader_fn):
+    """Adapter from (X_tr, X_val, X_te, y_tr, y_val, y_te) numpy six-tuples
+    to the (X_tr, Y_tr, X_te, Y_te) torch four-tuple this sweep expects.
+    Folds val back into train (the sweep has no validation concept)."""
+    X_tr, X_val, X_te, y_tr, y_val, y_te = loader_fn()
     X_tr = np.concatenate([X_tr, X_val], axis=0)
     y_tr = np.concatenate([y_tr, y_val], axis=0)
-    X_tr = torch.from_numpy(X_tr).float()
-    X_te = torch.from_numpy(X_te).float()
+    X_tr = torch.from_numpy(np.asarray(X_tr)).float()
+    X_te = torch.from_numpy(np.asarray(X_te)).float()
     Y_tr = torch.from_numpy(np.asarray(y_tr)).long()
     Y_te = torch.from_numpy(np.asarray(y_te)).long()
     return X_tr, Y_tr, X_te, Y_te
+
+
+def _cifar_pca_loader(data_dir):
+    """Wrap ``unstructured_pruning.cifar_scaling.load_cifar_pca`` to the
+    four-tuple torch contract. ``data_dir`` is accepted for signature
+    uniformity and currently ignored (the underlying loader caches under
+    ``/tmp/cifar10``)."""
+    del data_dir
+    from unstructured_pruning.cifar_scaling import load_cifar_pca
+    return _six_tuple_to_four(load_cifar_pca)
+
+
+def _cifar_resnet_loader(data_dir):
+    """Wrap ``pruning.cifar_scaling.load_cifar10`` (ResNet18 features at
+    FEATURE_DIM = 512). ``data_dir`` is accepted for signature uniformity
+    and currently ignored (the underlying loader caches features under
+    ``$FEATURE_CACHE_DIR``)."""
+    del data_dir
+    from pruning.cifar_scaling import load_cifar10
+    return _six_tuple_to_four(load_cifar10)
+
+
+def _digits_loader(data_dir):
+    """Wrap ``pruning.mnist_scaling.load_data`` (sklearn digits, 8x8 = 64
+    dims). ``data_dir`` is accepted for signature uniformity and ignored
+    (sklearn ships the data with the wheel)."""
+    del data_dir
+    from pruning.mnist_scaling import load_data
+    return _six_tuple_to_four(load_data)
 
 
 DATASETS = {
@@ -95,6 +120,16 @@ DATASETS = {
         'loader':   _cifar_pca_loader,
         'data_dir': '/tmp/cifar10',
         'name':     'CIFAR-10 PCA-200',
+    },
+    'cifar_resnet': {
+        'loader':   _cifar_resnet_loader,
+        'data_dir': '/tmp/cifar10',
+        'name':     'CIFAR-10 ResNet18 features',
+    },
+    'digits': {
+        'loader':   _digits_loader,
+        'data_dir': '',
+        'name':     'sklearn digits 8x8',
     },
 }
 
@@ -207,80 +242,109 @@ def render_overlay_grid(cells, output_path, *, have_latex,
     plt.close(fig)
 
 
-def render_heatmap(cells, output_path, *, have_latex,
-                   dataset_name: str, method: str) -> None:
-    """Two heatmaps over the (H, L) grid: mean signed residual and
-    mean absolute residual, both averaged over the A in (1/C + 0.05, 0.99)
-    transition window."""
+def render_residual_grid(cells, output_path, *, have_latex,
+                         dataset_name: str, method: str) -> None:
+    """One per-(H, L) panel showing the residual curve
+    ``A_emp(s) - A_F41(s)`` as a function of density ``s``, with seed
+    error bars on the empirical accuracy. Same layout as the overlay
+    grid so panels line up visually with the corresponding A(s) plots.
+
+    A shared y-range across all panels makes magnitudes comparable across
+    the grid; a horizontal y = 0 reference line marks where empirical
+    matches prediction; the transition window over which mean residuals
+    are computed (1/C + 0.05 < A_emp < 0.99) is shaded."""
     Hs = sorted({c['H'] for c in cells})
     Ls = sorted({c['L'] for c in cells})
-    Hi = {H: i for i, H in enumerate(Hs)}
-    Li = {L: i for i, L in enumerate(Ls)}
-    mbe = np.full((len(Ls), len(Hs)), np.nan)
-    mae = np.full((len(Ls), len(Hs)), np.nan)
+    n_rows = len(Ls)
+    n_cols = len(Hs)
+    panel_w = 3.0
+    panel_h = 2.3
+    fig_w = panel_w * n_cols + 1.4
+    fig_h = panel_h * n_rows + 1.2
+    fig = plt.figure(figsize=(fig_w, fig_h), facecolor='white')
+    gs = fig.add_gridspec(n_rows, n_cols,
+                          left=0.07, right=0.99,
+                          top=1.0 - 0.60 / fig_h,
+                          bottom=0.55 / fig_h,
+                          wspace=0.22, hspace=0.34)
+    cell_map = {(c['H'], c['L']): c for c in cells}
+
+    # Shared y-limit across all panels; floor so tiny residuals stay
+    # readable, ceiling so large outliers don't squash small ones.
+    max_abs = 0.0
     for c in cells:
-        s = np.array(c['densities'])
         A_emp = np.array(c['A_emp_mean'])
         A_F41 = np.array(c['A_F41'])
-        C = int(c['C'])
-        sel = (A_emp > 1.0 / C + 0.05) & (A_emp < 0.99)
-        if not sel.any():
-            continue
-        mbe[Li[c['L']], Hi[c['H']]] = float(np.mean(A_emp[sel] - A_F41[sel]))
-        mae[Li[c['L']], Hi[c['H']]] = float(
-            np.mean(np.abs(A_emp[sel] - A_F41[sel])))
+        diff = A_emp - A_F41
+        if np.isfinite(diff).any():
+            max_abs = max(max_abs, float(np.nanmax(np.abs(diff))))
+    y_lim = max(0.02, 1.1 * max_abs)
 
-    fig_w = 3.0 + 1.5 * len(Hs)
-    fig_h = max(3.5, 0.9 * len(Ls) + 2.0)
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(fig_w, fig_h),
-                                   facecolor='white')
+    cmap = plt.cm.viridis
+    for i, L in enumerate(Ls):
+        for j, H in enumerate(Hs):
+            ax = fig.add_subplot(gs[i, j])
+            cd = cell_map.get((H, L))
+            if cd is None:
+                ax.set_xticks([]); ax.set_yticks([])
+                continue
+            s = np.array(cd['densities'])
+            A_emp = np.array(cd['A_emp_mean'])
+            A_std = np.array(cd['A_emp_std'])
+            A_F41 = np.array(cd['A_F41'])
+            diff = A_emp - A_F41
+            C = int(cd['C'])
+            sel = (A_emp > 1.0 / C + 0.05) & (A_emp < 0.99)
+            mbe = (float(np.mean(diff[sel])) if sel.any() else float('nan'))
+            mae = (float(np.mean(np.abs(diff[sel]))) if sel.any()
+                   else float('nan'))
 
-    vmax = float(np.nanmax(np.abs(mbe))) if np.isfinite(mbe).any() else 0.05
-    if not np.isfinite(vmax) or vmax == 0.0:
-        vmax = 0.05
-    im1 = ax1.imshow(mbe, cmap='RdBu_r', vmin=-vmax, vmax=vmax,
-                     aspect='auto', origin='lower')
-    ax1.set_xticks(range(len(Hs))); ax1.set_xticklabels(Hs)
-    ax1.set_yticks(range(len(Ls))); ax1.set_yticklabels(Ls)
-    ax1.set_xlabel(r'$H$' if have_latex else 'H')
-    ax1.set_ylabel(r'$L$' if have_latex else 'L')
-    ax1.set_title(r'mean$(A_{\mathrm{emp}} - A_{\mathrm{F41}})$'
-                  if have_latex else 'mean(A_emp - A_F41)')
-    plt.colorbar(im1, ax=ax1, shrink=0.85)
-    for i in range(len(Ls)):
-        for j in range(len(Hs)):
-            v = mbe[i, j]
-            if np.isfinite(v):
-                ax1.text(j, i, f'{v:+.3f}', ha='center', va='center',
-                         fontsize=8.5, color='black')
+            # Shade the transition window so the eye knows which points
+            # contribute to the window-mean annotations.
+            if sel.any():
+                s_in = s[sel]
+                ax.axvspan(float(s_in.min()), float(s_in.max()),
+                           color='0.92', zorder=0)
+            ax.axhline(0.0, color='0.4', lw=0.6, linestyle='--', zorder=1)
+            ax.errorbar(s, diff, yerr=A_std, fmt='o', ms=2.4,
+                        color=cmap(0.25), alpha=0.85, capsize=0.0, lw=0.6,
+                        zorder=2)
+            # Connect samples to make the trend with s readable.
+            ax.plot(s, diff, color=cmap(0.25), lw=0.5, alpha=0.55, zorder=2)
+            ax.set_xscale('log')
+            ax.set_xlim(min(s), 1.0)
+            ax.set_ylim(-y_lim, y_lim)
 
-    vmax2 = float(np.nanmax(mae)) if np.isfinite(mae).any() else 0.05
-    if not np.isfinite(vmax2) or vmax2 == 0.0:
-        vmax2 = 0.05
-    im2 = ax2.imshow(mae, cmap='Reds', aspect='auto', origin='lower',
-                     vmin=0.0, vmax=vmax2)
-    ax2.set_xticks(range(len(Hs))); ax2.set_xticklabels(Hs)
-    ax2.set_yticks(range(len(Ls))); ax2.set_yticklabels(Ls)
-    ax2.set_xlabel(r'$H$' if have_latex else 'H')
-    ax2.set_ylabel(r'$L$' if have_latex else 'L')
-    ax2.set_title(r'mean$|A_{\mathrm{emp}} - A_{\mathrm{F41}}|$'
-                  if have_latex else 'mean|A_emp - A_F41|')
-    plt.colorbar(im2, ax=ax2, shrink=0.85)
-    for i in range(len(Ls)):
-        for j in range(len(Hs)):
-            v = mae[i, j]
-            if np.isfinite(v):
-                ax2.text(j, i, f'{v:.3f}', ha='center', va='center',
-                         fontsize=8.5, color='black')
+            if i == n_rows - 1:
+                ax.set_xlabel(r'$s$' if have_latex else 's')
+            else:
+                ax.set_xticklabels([])
+            if j == 0:
+                ax.set_ylabel(rf'$L = {L}$' if have_latex
+                              else f'L = {L}')
+            else:
+                ax.set_yticklabels([])
+            if i == 0:
+                ax.set_title(rf'$H = {H}$' if have_latex
+                             else f'H = {H}', fontsize=10)
+            ax.grid(True, which='both', alpha=0.25, lw=0.3)
+            txt = ((rf'$\langle\Delta\rangle={mbe:+.3f}$'
+                    '\n'
+                    rf'$\langle|\Delta|\rangle={mae:.3f}$')
+                   if have_latex
+                   else (f'<Δ>={mbe:+.3f}\n<|Δ|>={mae:.3f}'))
+            ax.text(0.03, 0.97, txt, transform=ax.transAxes,
+                    ha='left', va='top', fontsize=6.8,
+                    bbox=dict(boxstyle='round,pad=0.25', fc='white',
+                              ec='0.55', lw=0.4, alpha=0.92))
 
     fig.suptitle(
-        (rf'F41 vs empirical residuals -- {dataset_name}, '
-         rf'{method} pruning, transition window only'
+        (rf'Residual $A_{{\mathrm{{emp}}}}(s) - A_{{\mathrm{{F41}}}}(s)$ '
+         rf'-- {dataset_name}, {method} pruning'
          if have_latex
-         else f'F41 vs empirical residuals — {dataset_name}, '
-              f'{method} pruning, transition window only'),
-        y=1.02)
-    plt.tight_layout()
+         else f'Residual A_emp(s) − A_F41(s) — {dataset_name}, '
+              f'{method} pruning'),
+        y=1.0 - 0.14 / fig_h)
     fig.savefig(output_path, facecolor='white')
     plt.close(fig)
 
@@ -311,6 +375,9 @@ def main():
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--data-dir', default=None)
     ap.add_argument('--output-dir', default=None)
+    ap.add_argument('--from-json', default=None,
+                    help='skip training; re-render plots from this '
+                         'results.json file (uses cached cells only)')
     args = ap.parse_args()
 
     have_latex = _configure_style()
@@ -322,6 +389,22 @@ def main():
         f'unstructured_pruning/toy_examples/figures/'
         f'sweep_{args.dataset}_{args.method}')
     os.makedirs(output_dir, exist_ok=True)
+
+    # ----- re-render from cached JSON ---------------------------------
+    if args.from_json is not None:
+        with open(args.from_json) as f:
+            blob = json.load(f)
+        cells = blob['cells']
+        print(f'  Re-rendering {len(cells)} cells from {args.from_json}')
+        overlay_path = os.path.join(output_dir, 'overlay.png')
+        render_overlay_grid(cells, overlay_path, have_latex=have_latex,
+                            dataset_name=ds['name'], method=args.method)
+        print(f'Saved figure: {overlay_path}')
+        residual_path = os.path.join(output_dir, 'residuals.png')
+        render_residual_grid(cells, residual_path, have_latex=have_latex,
+                             dataset_name=ds['name'], method=args.method)
+        print(f'Saved figure: {residual_path}')
+        return
 
     print(f'  Dataset: {ds["name"]}  method: {args.method}')
     print(f'  Loading from {data_dir} ...')
@@ -392,10 +475,10 @@ def main():
                         dataset_name=ds['name'], method=args.method)
     print(f'Saved figure: {overlay_path}')
 
-    heat_path = os.path.join(output_dir, 'heatmap.png')
-    render_heatmap(cells, heat_path, have_latex=have_latex,
-                   dataset_name=ds['name'], method=args.method)
-    print(f'Saved figure: {heat_path}')
+    residual_path = os.path.join(output_dir, 'residuals.png')
+    render_residual_grid(cells, residual_path, have_latex=have_latex,
+                         dataset_name=ds['name'], method=args.method)
+    print(f'Saved figure: {residual_path}')
 
 
 if __name__ == '__main__':
