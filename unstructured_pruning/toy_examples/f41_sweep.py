@@ -67,11 +67,34 @@ def _mnist_loader(data_dir):
     return load_mnist(data_dir)
 
 
+def _cifar_pca_loader(data_dir):
+    """Wrap ``unstructured_pruning.cifar_scaling.load_cifar_pca`` to the
+    four-tuple torch contract used by this sweep. ``data_dir`` is accepted
+    for signature uniformity and currently ignored (the underlying loader
+    caches under ``/tmp/cifar10``)."""
+    del data_dir  # not configurable through the underlying loader
+    from unstructured_pruning.cifar_scaling import load_cifar_pca
+    X_tr, X_val, X_te, y_tr, y_val, y_te = load_cifar_pca()
+    # Fold val back into train: the sweep has no validation concept.
+    X_tr = np.concatenate([X_tr, X_val], axis=0)
+    y_tr = np.concatenate([y_tr, y_val], axis=0)
+    X_tr = torch.from_numpy(X_tr).float()
+    X_te = torch.from_numpy(X_te).float()
+    Y_tr = torch.from_numpy(np.asarray(y_tr)).long()
+    Y_te = torch.from_numpy(np.asarray(y_te)).long()
+    return X_tr, Y_tr, X_te, Y_te
+
+
 DATASETS = {
     'mnist': {
         'loader':   _mnist_loader,
         'data_dir': DEFAULT_MNIST_DIR,
         'name':     'MNIST 28x28',
+    },
+    'cifar_pca': {
+        'loader':   _cifar_pca_loader,
+        'data_dir': '/tmp/cifar10',
+        'name':     'CIFAR-10 PCA-200',
     },
 }
 

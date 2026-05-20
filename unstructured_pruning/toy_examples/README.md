@@ -415,6 +415,64 @@ Mean absolute residual on the same window:
   next-order correction (exact orthant in F16, or off-diagonal terms in
   the recursion)*.
 
+**Same sweep on CIFAR-10** (`--dataset cifar_pca`, same `(H, L)` grid,
+PCA-200 raw-pixel features so the FC + ReLU architecture is genuinely
+just classifying images — no feature backbone). Output in
+`figures/sweep_cifar_pca_random/`.
+
+Mean residual `A_emp − A_F41`:
+
+| L \ H |     64 |    128 |    256 |    512 |
+|-------|-------:|-------:|-------:|-------:|
+| 1     | +0.031 | +0.030 | +0.028 | +0.022 |
+| 2     | +0.047 | +0.040 | +0.031 | +0.027 |
+| 3     | +0.026 | +0.015 | +0.008 | +0.004 |
+| 4     | +0.006 | +0.005 | −0.001 | −0.002 |
+
+Mean absolute residual:
+
+| L \ H |    64 |   128 |   256 |   512 |
+|-------|------:|------:|------:|------:|
+| 1     | 0.031 | 0.030 | 0.029 | 0.022 |
+| 2     | 0.047 | 0.040 | 0.031 | 0.027 |
+| 3     | 0.026 | 0.015 | 0.008 | 0.005 |
+| 4     | 0.007 | 0.006 | 0.004 | 0.004 |
+
+The shape is identical to MNIST: bias monotone-decreasing in both axes,
+sign-flipping around `L ≈ 3 – 4` at `H ≥ 256`. Two CIFAR-specific
+observations:
+
+- **L = 2 is locally worse than L = 1** on CIFAR (0.04 vs 0.03), whereas
+  on MNIST L = 2 was always at or below L = 1. The cause is visible in
+  the overlay: at L = 1, the very narrow trained networks (H = 256, 512)
+  fail to converge on CIFAR-PCA at the default 4-epoch budget
+  (`A_full ≈ 0.22 – 0.23`, vs ≈ 0.41 at H = 64, 128), which narrows the
+  fitting window and produces a slightly under-biased residual estimate.
+  The L = 2 row, where every cell converges to `A_full ≈ 0.45 – 0.49`,
+  is the cleaner reading.
+- **Sub-1 % bias on the entire L = 4 row.** Even at H = 64, mean
+  `|residual| = 0.007`. On MNIST the L = 4 row spanned 0.008 – 0.023;
+  on CIFAR it spans 0.004 – 0.007. F41 is *quantitatively tighter* on
+  CIFAR at depth — likely because the higher-class-overlap of CIFAR
+  (correlated centroids) suppresses the positive-competitor-correlation
+  bias that drives the shallow-network residual.
+
+Both datasets ultimately tell the same story: **for `L ≥ 3` and
+`H ≥ 256`, the parameter-free F41 recursion predicts `A(s)` everywhere
+across the pruning transition to within the seed-to-seed scatter of the
+empirical accuracy.** The sweet-spot regime is identical across
+datasets; CIFAR is, if anything, the tighter match.
+
+Adding a new dataset is a one-line `DATASETS` registry entry:
+
+```python
+DATASETS = {
+    'mnist':    {...},
+    'cifar_pca':{'loader': _cifar_pca_loader, ...},
+    # 'sklearn':{'loader': _sklearn_loader, ...},
+}
+```
+
 ---
 
 ## Combined significance
