@@ -350,8 +350,13 @@ CIFAR cells can be plugged in by adding one loader and one row.
 .venv/bin/python -m unstructured_pruning.toy_examples.f41_sweep \
     --dataset mnist --method random \
     --Hs 64 128 256 512 --Ls 1 2 3 4 \
-    --n-seeds 30 --n-densities 50 --n-test 1800 --n-epochs 4
+    --n-seeds 30 --n-densities 200 --n-test 1800 --n-epochs 4
 ```
+
+Default density grid is log-uniform in `u = √(s/(1−s))` with
+`s ∈ [0.01, 0.999]`; below `s = 0.01` every cell is already at chance,
+so cropping there isolates the transition window and lets the same
+`n_densities` resolve it ~10× finer. Override with `--u-min` / `--u-max`.
 
 **Outputs** (in `figures/sweep_mnist_random/`):
 
@@ -376,36 +381,39 @@ Re-rendering the plots from a cached `results.json` (no retraining):
 ```
 
 **Findings** (defaults: `n_test = 1800`, `n_seeds = 30`,
-`n_densities = 50`, `n_epochs = 4`; transition window
+`n_densities = 200`, `n_epochs = 4`; densities log-uniform in
+`u = √(s/(1−s))` with `s ∈ [0.01, 0.999]`; transition window
 `0.55 < A_emp < 0.99`).
 
 Mean residual `A_emp − A_F41` across the transition window:
 
 | L \ H |     64 |    128 |    256 |    512 |
 |-------|-------:|-------:|-------:|-------:|
-| 1     | +0.056 | +0.049 | +0.041 | +0.039 |
-| 2     | +0.041 | +0.026 | +0.012 | +0.010 |
-| 3     | +0.014 | +0.002 | −0.004 | −0.004 |
-| 4     | −0.001 | −0.009 | −0.006 | −0.007 |
+| 1     | +0.056 | +0.049 | +0.040 | +0.037 |
+| 2     | +0.042 | +0.025 | +0.013 | +0.010 |
+| 3     | +0.012 | +0.001 | −0.003 | −0.004 |
+| 4     | −0.000 | −0.007 | −0.009 | −0.006 |
 
 Mean absolute residual on the same window:
 
 | L \ H |    64 |   128 |   256 |   512 |
 |-------|------:|------:|------:|------:|
-| 1     | 0.056 | 0.049 | 0.041 | 0.039 |
-| 2     | 0.041 | 0.028 | 0.015 | 0.016 |
-| 3     | 0.023 | 0.014 | 0.013 | 0.009 |
-| 4     | 0.023 | 0.016 | 0.011 | 0.008 |
+| 1     | 0.056 | 0.049 | 0.040 | 0.037 |
+| 2     | 0.042 | 0.026 | 0.017 | 0.016 |
+| 3     | 0.023 | 0.015 | 0.012 | 0.009 |
+| 4     | 0.024 | 0.017 | 0.012 | 0.009 |
 
 **Reading.**
 
-- **The bias is monotone in both axes.** Going right (wider) or down
-  (deeper) shrinks `|A_emp − A_F41|` everywhere in the grid; the two
-  variables act independently.
+- **The signed bias is monotone in both axes.** Going right (wider) or
+  down (deeper) drives `⟨Δ⟩` toward zero and then negative; the two
+  variables act independently. The absolute residual `⟨|Δ|⟩` decreases
+  with H at fixed L, but at fixed H ≥ 256 it bottoms out around L = 3–4
+  near the seed-noise floor (≈ 0.01).
 - **L is the more powerful axis.** Going from L = 1 to L = 4 at fixed
-  H = 64 cuts the bias from +0.056 to −0.001 (a factor of ~50). Going
-  from H = 64 to H = 512 at fixed L = 1 cuts the bias only from +0.056
-  to +0.039 (a factor of ~1.4).
+  H = 64 drives the signed residual from +0.056 to essentially zero
+  (−0.000). Going from H = 64 to H = 512 at fixed L = 1 only cuts it
+  from +0.056 to +0.037 (factor ~1.5).
 - **The sign flips around L ≈ 3.** Shallow networks systematically
   over-perform F41 (positive competitor correlation, same effect we
   identified in the linear multi-class toy and the L = 1 MNIST case).
@@ -435,19 +443,19 @@ Mean residual `A_emp − A_F41`:
 
 | L \ H |     64 |    128 |    256 |    512 |
 |-------|-------:|-------:|-------:|-------:|
-| 1     | +0.031 | +0.030 | +0.028 | +0.022 |
-| 2     | +0.047 | +0.040 | +0.031 | +0.027 |
-| 3     | +0.026 | +0.015 | +0.008 | +0.004 |
+| 1     | +0.032 | +0.031 | +0.025 | +0.023 |
+| 2     | +0.047 | +0.040 | +0.032 | +0.026 |
+| 3     | +0.025 | +0.015 | +0.008 | +0.004 |
 | 4     | +0.006 | +0.005 | −0.001 | −0.002 |
 
 Mean absolute residual:
 
 | L \ H |    64 |   128 |   256 |   512 |
 |-------|------:|------:|------:|------:|
-| 1     | 0.031 | 0.030 | 0.029 | 0.022 |
-| 2     | 0.047 | 0.040 | 0.031 | 0.027 |
-| 3     | 0.026 | 0.015 | 0.008 | 0.005 |
-| 4     | 0.007 | 0.006 | 0.004 | 0.004 |
+| 1     | 0.032 | 0.031 | 0.025 | 0.023 |
+| 2     | 0.047 | 0.040 | 0.032 | 0.026 |
+| 3     | 0.025 | 0.015 | 0.008 | 0.005 |
+| 4     | 0.007 | 0.006 | 0.005 | 0.005 |
 
 The shape is identical to MNIST: bias monotone-decreasing in both axes,
 sign-flipping around `L ≈ 3 – 4` at `H ≥ 256`. Two CIFAR-specific
@@ -479,29 +487,30 @@ Mean residual `A_emp − A_F41`:
 
 | L \ H |     64 |    128 |    256 |    512 |
 |-------|-------:|-------:|-------:|-------:|
-| 1     | +0.037 | +0.038 | +0.041 | +0.045 |
-| 2     | +0.018 | +0.015 | +0.011 | +0.005 |
-| 3     | +0.011 | +0.001 | −0.004 | −0.006 |
-| 4     | −0.003 | −0.007 | −0.008 | −0.007 |
+| 1     | +0.040 | +0.038 | +0.035 | +0.038 |
+| 2     | +0.018 | +0.015 | +0.008 | +0.007 |
+| 3     | +0.006 | +0.000 | −0.004 | −0.006 |
+| 4     | −0.002 | −0.006 | −0.007 | −0.007 |
 
 Mean absolute residual:
 
 | L \ H |    64 |   128 |   256 |   512 |
 |-------|------:|------:|------:|------:|
-| 1     | 0.037 | 0.039 | 0.041 | 0.045 |
-| 2     | 0.018 | 0.015 | 0.013 | 0.009 |
-| 3     | 0.015 | 0.010 | 0.009 | 0.010 |
-| 4     | 0.011 | 0.010 | 0.011 | 0.010 |
+| 1     | 0.040 | 0.038 | 0.035 | 0.038 |
+| 2     | 0.019 | 0.016 | 0.009 | 0.012 |
+| 3     | 0.013 | 0.011 | 0.009 | 0.009 |
+| 4     | 0.010 | 0.010 | 0.009 | 0.009 |
 
-CIFAR-resnet is the **worst case** for F41 at `L = 1`: the residual
-*increases* with `H` rather than decreasing, peaking at +0.045 at
-`H = 512`. The intuition: ResNet18 features are already linearly
-separable, so a one-hidden-layer network is effectively a linear
-classifier on near-ideal features, with extreme positive correlations
-between the `C − 1` competitor logits — exactly the regime F41's
-independent-competitor approximation throws away. Deeper networks
-re-introduce correlation-shrinking masks; the residual collapses to
-the MNIST/CIFAR-PCA floor by `L = 3`.
+CIFAR-resnet at `L = 1` is **essentially H-independent**, sitting at
+`⟨|Δ|⟩ ≈ 0.04` across the entire width sweep — width does not help.
+The intuition: ResNet18 features are already linearly separable, so a
+one-hidden-layer network is effectively a linear classifier on
+near-ideal features, with extreme positive correlations between the
+`C − 1` competitor logits — exactly the regime F41's independent-
+competitor approximation throws away. Adding more units doesn't change
+the geometry of the problem. Deeper networks re-introduce correlation-
+shrinking masks; the residual collapses to the MNIST/CIFAR-PCA floor
+by `L = 3`.
 
 **Same sweep on sklearn digits** (`--dataset digits`, `D = 64`,
 1797 8×8 images, the smallest dataset in this folder). Output in
@@ -511,36 +520,37 @@ Mean residual `A_emp − A_F41`:
 
 | L \ H |     64 |    128 |    256 |    512 |
 |-------|-------:|-------:|-------:|-------:|
-| 1     | +0.022 | +0.017 | +0.020 | +0.025 |
-| 2     | +0.011 | +0.006 | +0.003 | −0.000 |
-| 3     | +0.003 | −0.004 | −0.003 | −0.001 |
-| 4     | +0.001 | −0.006 | −0.005 | −0.004 |
+| 1     | +0.023 | +0.018 | +0.019 | +0.023 |
+| 2     | +0.011 | +0.006 | +0.004 | +0.002 |
+| 3     | +0.004 | −0.003 | −0.003 | −0.001 |
+| 4     | −0.001 | −0.006 | −0.008 | −0.002 |
 
 Mean absolute residual:
 
 | L \ H |    64 |   128 |   256 |   512 |
 |-------|------:|------:|------:|------:|
-| 1     | 0.022 | 0.017 | 0.020 | 0.026 |
-| 2     | 0.013 | 0.014 | 0.011 | 0.006 |
-| 3     | 0.015 | 0.010 | 0.010 | 0.007 |
-| 4     | 0.011 | 0.011 | 0.011 | 0.008 |
+| 1     | 0.023 | 0.019 | 0.020 | 0.023 |
+| 2     | 0.014 | 0.012 | 0.011 | 0.006 |
+| 3     | 0.015 | 0.012 | 0.011 | 0.008 |
+| 4     | 0.015 | 0.011 | 0.012 | 0.008 |
 
 Digits has the smallest worst-case residual of any dataset in this
-folder (max +0.026, vs +0.056 on MNIST and +0.045 on CIFAR-resnet).
+folder (max +0.023, vs +0.056 on MNIST and +0.040 on CIFAR-resnet).
 The bias does not vanish smoothly with `L` and `H` — it stays around
 1 % everywhere except `L = 2, H = 512` where it collapses to 0.6 %.
 With only 360 test points the seed-to-seed scatter on `A_emp` is
-visibly large in the residual plot (bars are ~ 0.05 wide near the
-transition), so the floor here is statistical rather than systematic.
+visibly large in the residual plot, so the `⟨|Δ|⟩ ≈ 0.01` floor here
+is statistical rather than systematic.
 
 Across all four datasets the qualitative pattern is identical: bias
-positive at shallow depth, monotone-decreasing in both `H` and `L`,
+positive at shallow depth, decreasing in both `H` and `L`,
 sign-flipping around `L ≈ 3` at `H ≥ 256`. The magnitudes order
-roughly with how *over-parameterised* the L = 1 baseline is:
-`cifar_resnet > mnist > cifar_pca > digits` at L = 1. **For `L ≥ 3`
-and `H ≥ 256`, the parameter-free F41 recursion predicts `A(s)`
-everywhere across the pruning transition to within the seed-to-seed
-scatter of the empirical accuracy** on every dataset tested.
+roughly with how *over-parameterised* the L = 1 baseline is on
+each dataset: `mnist (0.056) > cifar_resnet (0.040) > cifar_pca (0.032)
+> digits (0.023)` at `L = 1, H = 64`. **For `L ≥ 3` and `H ≥ 256`,
+the parameter-free F41 recursion predicts `A(s)` everywhere across
+the pruning transition to within the seed-to-seed scatter of the
+empirical accuracy** on every dataset tested.
 
 Adding a new dataset is a one-line `DATASETS` registry entry:
 

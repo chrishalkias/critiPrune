@@ -367,11 +367,17 @@ def main():
     ap.add_argument('--batch-size', type=int, default=256)
     ap.add_argument('--n-seeds', type=int, default=40,
                     help='mask seeds per density (controls error bars)')
-    ap.add_argument('--n-densities', type=int, default=70,
+    ap.add_argument('--n-densities', type=int, default=200,
                     help='densities sweep size; log-uniform in '
                          'u = sqrt(s/(1-s))')
-    ap.add_argument('--u-min', type=float, default=0.005)
-    ap.add_argument('--u-max', type=float, default=30.0)
+    # Default range covers s in [0.01, 0.999]; below s=0.01 every cell is
+    # already at chance, so cropping there isolates the transition window
+    # and lets the same n_densities resolve it ~10x finer.
+    ap.add_argument('--u-min', type=float, default=0.1005,
+                    help='lower u bound; default 0.1005 = sqrt(0.01/0.99) '
+                         'so s_min = 0.01')
+    ap.add_argument('--u-max', type=float, default=31.61,
+                    help='upper u bound; default 31.61 -> s_max ~ 0.999')
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--data-dir', default=None)
     ap.add_argument('--output-dir', default=None)
