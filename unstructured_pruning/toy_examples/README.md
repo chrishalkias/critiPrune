@@ -570,6 +570,49 @@ y_val, y_te)` numpy loader.
 
 ---
 
+## `f41_scaling.py` — power-law scaling of the F41 critical density
+
+Given the cached `results.json` from each `f41_sweep` run, the critical
+density `s_0` is extracted per cell as the half-transition density:
+
+```
+A_F41(s_0) = (A_unpruned + 1/C) / 2
+```
+
+(linear interpolation on the 200-point F41 curve; same recipe for
+`s_0_emp` on the empirical curve). The sweep now stores `s0_F41`,
+`s0_emp`, and `target` alongside `densities` / `A_F41` / `A_emp_mean`.
+
+The scaling script fits
+
+```
+log s_0 = a + α_H · log H + α_L · log L
+```
+
+per dataset (plus per-`L` and per-`H` sub-fits) and emits
+
+- `figures/scaling/scaling.png` — `log s_0` vs `log H` for each
+  dataset, one line per `L`, with `1/H` reference line.
+- `figures/scaling/scaling.md` — exponent tables, F41-vs-empirical
+  cross-check, theoretical reference, and discussion.
+- `figures/scaling/scaling.json` — machine-readable fit record.
+
+Run:
+
+```bash
+.venv/bin/python -m unstructured_pruning.toy_examples.f41_scaling
+```
+
+**Headline result.** The H-exponent `α_H ∈ [−0.21, −0.07]` across the
+four datasets — an order of magnitude shallower than D17's
+prediction of `α_H = −1`. The L-exponent `α_L` is *strongly positive*
+(`+0.16` to `+1.14`): deeper networks need a higher density to reach
+the half-transition. This is the multiplicative signal attenuation
+through stacked masked ReLU layers, absent from the bare leading-order
+theory. See `scaling.md` for the full tables and per-dataset commentary.
+
+---
+
 ## Combined significance
 
 Taken together, the two toys say:

@@ -135,6 +135,41 @@ DATASETS = {
 
 
 # ---------------------------------------------------------------------------
+# Critical-point extraction
+# ---------------------------------------------------------------------------
+def _extract_s_0(densities, A_values, target):
+    """Half-transition critical density: the smallest ``s`` for which
+    ``A(s) >= target``, computed by linear interpolation on the cached
+    ``(densities, A_values)`` curve.
+
+    ``A_values`` is assumed monotone non-decreasing in ``densities`` (true
+    for ``A_F41`` by construction and empirically for the random-mask
+    ``A_emp`` in this folder). Returns ``nan`` if ``target`` lies outside
+    the data's reachable range."""
+    densities = np.asarray(densities, dtype=float)
+    A_values  = np.asarray(A_values,  dtype=float)
+    order = np.argsort(densities)
+    s_sorted = densities[order]
+    A_sorted = A_values[order]
+    if target < A_sorted[0] or target > A_sorted[-1]:
+        return float('nan')
+    return float(np.interp(target, A_sorted, s_sorted))
+
+
+def _ensure_s_0_fields(cell):
+    """Populate cell['s0_F41'], cell['s0_emp'], cell['target'] if absent.
+    Mutates and returns whether anything changed."""
+    if 's0_F41' in cell and 's0_emp' in cell and 'target' in cell:
+        return False
+    target = 0.5 * (float(cell['A_unpruned']) + 1.0 / float(cell['C']))
+    cell['target'] = target
+    cell['s0_F41'] = _extract_s_0(cell['densities'], cell['A_F41'], target)
+    cell['s0_emp'] = _extract_s_0(cell['densities'], cell['A_emp_mean'],
+                                  target)
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Plot style
 # ---------------------------------------------------------------------------
 def _configure_style():
@@ -401,6 +436,13 @@ def main():
         with open(args.from_json) as f:
             blob = json.load(f)
         cells = blob['cells']
+        mutated = False
+        for c in cells:
+            mutated |= _ensure_s_0_fields(c)
+        if mutated:
+            with open(args.from_json, 'w') as f:
+                json.dump(blob, f, indent=2)
+            print(f'  Back-filled s_0 fields; wrote {args.from_json}')
         print(f'  Re-rendering {len(cells)} cells from {args.from_json}')
         overlay_path = os.path.join(output_dir, 'overlay.png')
         render_overlay_grid(cells, overlay_path, have_latex=have_latex,
@@ -461,6 +503,12 @@ def main():
             print(f'    (H={H}, L={L}) -> mean(A_emp-A_F41)={mbe:+.4f}, '
                   f'mean|.|={mae:.4f}, N={int(sel.sum())}')
 
+            target = 0.5 * (A_full + 1.0 / C)
+            s0_F41 = _extract_s_0(densities, A_F41, target)
+            s0_emp = _extract_s_0(densities, A_mean, target)
+            print(f'    s_0(F41)={s0_F41:.4f}, s_0(emp)={s0_emp:.4f}, '
+                  f'target={target:.4f}')
+
             cells.append({
                 'H': int(H), 'L': int(L), 'D': D, 'C': C,
                 'A_unpruned': A_full,
@@ -468,6 +516,9 @@ def main():
                 'A_emp_mean': A_mean.tolist(),
                 'A_emp_std':  A_std.tolist(),
                 'A_F41':      A_F41.tolist(),
+                'target':     target,
+                's0_F41':     s0_F41,
+                's0_emp':     s0_emp,
             })
 
     out_json = os.path.join(output_dir, 'results.json')
