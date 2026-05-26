@@ -36,7 +36,7 @@ def _gaussian_plus_const(sigma, a, Sigma, b):
 
 # scipy.optimize.curve_fit bound used in the sweep -- beta values at this
 # value mean the fit saturated and the true steepness is unresolved.
-BETA_CAP = 20.0
+BETA_CAP = 200.0
 
 
 def _enable_latex():
@@ -52,7 +52,14 @@ def _enable_latex():
         return False
 
 
-def _group_by_cell(rows, min_r2=0.80, drop_saturated=True):
+def _group_by_cell(rows, min_r2=0.80):
+    """Return {(H, L): [(sigma, beta, R2, saturated_bool), ...]}.
+
+    Beta values pinned at the curve_fit upper bound (>= BETA_CAP - 0.5)
+    are flagged as saturated. Saturated rows are kept for plotting so the
+    low-sigma region is visible, but downstream callers can choose to
+    exclude them from fits.
+    """
     out = defaultdict(list)
     for r in rows:
         if r.get('sigmoid_R2') is None:
@@ -62,10 +69,10 @@ def _group_by_cell(rows, min_r2=0.80, drop_saturated=True):
         beta = r.get('sigmoid_beta')
         if beta is None:
             continue
-        if drop_saturated and beta >= BETA_CAP - 0.5:
-            continue
+        saturated = beta >= BETA_CAP - 0.5
         out[(int(r['H']), int(r['L']))].append((
-            float(r['sigma']), float(beta), float(r['sigmoid_R2'])))
+            float(r['sigma']), float(beta),
+            float(r['sigmoid_R2']), bool(saturated)))
     for k in out:
         out[k].sort()
     return dict(out)
