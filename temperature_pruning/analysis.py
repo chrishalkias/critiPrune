@@ -12,6 +12,14 @@ Two diagnostics on the (H, L, sigma) -> p_c table produced by ``core.py``:
    T/p equivalence implies they all collapse onto a single master curve.
    The collapse score is the ratio of inter-curve scatter to intra-curve
    scatter at matched x; near 1 means good collapse.
+
+3. **Model comparison** (reviewer diagnostic)
+   Per cell, compare
+       Model A: p_c = a + b*sigma + c*sigma^2  (k=3)
+       Model B: p_c = a + c*sigma^2            (k=2, no linear term)
+   using AIC/BIC and a two-sided t-test for H0: b=0.  The SK bond-disorder
+   prediction is b=0 (pure quadratic); ΔAIC and the p-value quantify how
+   much evidence the data actually hold against that null.
 """
 
 from __future__ import annotations
@@ -319,5 +327,173 @@ def collapse_score(results, sigma_min=1e-6, n_grid=40, min_r2=0.80):
             'per_sigma_mean': {float(s): per_sigma_mean[s].tolist()
                                for s in per_sigma_mean},
             'n_sigmas': int(Y.shape[0]),
+        }
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Model comparison: full quadratic vs. pure quadratic (no linear term)
+# ---------------------------------------------------------------------------
+
+def _aic(rss, n, k):
+    """Akaike Information Criterion for an OLS model."""
+    if rss <= 0 or n <= k:
+        return float('nan')
+    return n * float(np.log(rss / n)) + 2 * k
+
+
+def _bic(rss, n, k):
+    """Bayesian Information Criterion for an OLS model."""
+    if rss <= 0 or n <= k:
+        return float('nan')
+    return n * float(np.log(rss / n)) + k * float(np.log(n))
+
+
+def _fit_no_linear(x, y):
+    """Fit p_c = a + c*x^2 (no linear term) via ordinary least-squares.
+
+    Uses the design matrix [1, x^2] so the linear coefficient is structurally
+    absent — this is the SK bond-disorder null hypothesis.
+
+    Returns
+    -------
+    dict with keys: a, c, a_se, c_se, R2, rss, n, k, AIC, BIC
+        or None when the system is underdetermined.
+    """
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    n = len(x)
+    if n < 2:
+        return None
+    X = np.stack([np.ones(n), x ** 2], axis=1)
+    coeffs, _, rank, _ = np.linalg.lstsq(X, y, rcond=None)
+    y_hat = X @ coeffs
+    rss = float(np.sum((y - y_hat) ** 2))
+    ss_tot = float(np.sum((y - y.mean()) ** 2))
+    r2 = 1.0 - rss / ss_tot if ss_tot > 0 else float('nan')
+    k = 2
+    # Covariance via (X^T X)^{-1} * s^2, s^2 = RSS/(n-k)
+    s2 = rss / max(n - k, 1)
+    XtX_inv = np.linalg.pinv(X.T @ X)
+    se = np.sqrt(np.diag(s2 * XtX_inv))
+    return {
+        'a': float(coeffs[0]),
+        'c': float(coeffs[1]),
+        'a_se': float(se[0]),
+        'c_se': float(se[1]),
+        'R2': float(r2),
+        'rss': rss,
+        'n': n,
+        'k': k,
+        'AIC': _aic(rss, n, k),
+        'BIC': _bic(rss, n, k),
+    }
+
+
+def fit_model_comparison(pc_by_cell, restrict_to_F_regime=True,
+                         initial_sigma_max=0.3):
+    """Per-cell AIC/BIC model comparison and t-test for the linear coefficient.
+
+    Compares two models fitted on the same F-regime sigma window:
+
+        Model A  p_c = a + b*sigma + c*sigma^2   (k=3 parameters)
+        Model B  p_c = a + c*sigma^2             (k=2, b forced to zero)
+
+    The SK bond-disorder prediction corresponds to Model B (b=0).  A small
+    ΔAIC = AIC_B - AIC_A (< 2) and a non-significant p-value for b support
+    Model B as the parsimonious description.
+
+    The F-regime window is determined identically to ``fit_critical_line``
+    (running-R² cutoff from ``_residual_based_F_regime_fit``), so both models
+    are compared on exactly the same data points — no circularity between the
+    window choice and the coefficient estimates, because the window uses the
+    full-quadratic R² and is finalized *before* computing AIC/t-test.
+
+    Parameters
+    ----------
+    pc_by_cell : dict from ``group_pc_by_cell``
+    restrict_to_F_regime : bool
+        If True (default), truncate to the iterative F-regime window.
+    initial_sigma_max : float
+        Bootstrap window for the running-R² cutoff.
+
+    Returns
+    -------
+    dict {(H, L): {
+        'sigma_cutoff': float,
+        'sigmas': list[float],
+        'p_cs': list[float],
+        'model_A': dict,        # full quadratic fit + t-test fields
+        'model_B': dict,        # no-linear fit
+        'delta_AIC': float,     # AIC_B - AIC_A  (>0 => A preferred)
+        'delta_BIC': float,
+    }}
+    """
+    from scipy import stats as _st
+
+    out = {}
+    for (H, L), entries in pc_by_cell.items():
+        by_sigma_vals = defaultdict(list)
+        for (sigma, s0, _s0_std, _beta, _r2, _rep) in entries:
+            by_sigma_vals[float(sigma)].append(s0)
+        sigmas_all = sorted(by_sigma_vals)
+        p_cs_all = [float(np.mean(by_sigma_vals[s])) for s in sigmas_all]
+
+        if len(sigmas_all) < 4:
+            continue
+
+        if restrict_to_F_regime:
+            window_fit = _residual_based_F_regime_fit(
+                sigmas_all, p_cs_all, degree=2,
+                initial_sigma_max=initial_sigma_max,
+            )
+            if window_fit is None:
+                continue
+            cutoff = float(window_fit['sigma_cutoff'])
+        else:
+            cutoff = float(sigmas_all[-1])
+
+        # Select the F-regime points (same for both models).
+        mask = np.array(sigmas_all) <= cutoff + 1e-9
+        x = np.array(sigmas_all)[mask]
+        y = np.array(p_cs_all)[mask]
+        if len(x) < 3:
+            continue
+
+        # --- Model A: full quadratic ---
+        fa = _poly_fit(x, y, degree=2)
+        if fa is None:
+            continue
+        y_hat_a = np.polyval(list(reversed(fa['coeffs'])), x)
+        rss_a = float(np.sum((y - y_hat_a) ** 2))
+        n, k_a = fa['n'], 3
+        fa['rss'] = rss_a
+        fa['k'] = k_a
+        fa['AIC'] = _aic(rss_a, n, k_a)
+        fa['BIC'] = _bic(rss_a, n, k_a)
+        # Two-sided t-test for H0: b = 0
+        b, b_se = fa['b'], fa['b_se']
+        t_b = b / b_se if b_se > 0 else float('nan')
+        df = n - k_a
+        p_b = float(2 * _st.t.sf(abs(t_b), df=df)) if np.isfinite(t_b) else float('nan')
+        t_crit = float(_st.t.ppf(0.975, df=df)) if df > 0 else float('nan')
+        fa['t_b'] = float(t_b)
+        fa['p_b'] = float(p_b)
+        fa['ci95_b_lo'] = float(b - t_crit * b_se) if np.isfinite(t_crit) else float('nan')
+        fa['ci95_b_hi'] = float(b + t_crit * b_se) if np.isfinite(t_crit) else float('nan')
+
+        # --- Model B: no linear term ---
+        fb = _fit_no_linear(x, y)
+        if fb is None:
+            continue
+
+        out[(H, L)] = {
+            'sigma_cutoff': cutoff,
+            'sigmas': x.tolist(),
+            'p_cs': y.tolist(),
+            'model_A': fa,
+            'model_B': fb,
+            'delta_AIC': fb['AIC'] - fa['AIC'],
+            'delta_BIC': fb['BIC'] - fa['BIC'],
         }
     return out

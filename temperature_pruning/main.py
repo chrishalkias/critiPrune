@@ -211,8 +211,8 @@ def main():
         )
 
     print("\n  Generating figures...")
-    fits, scores = make_all_plots(results, args.output_dir,
-                                  min_r2=args.min_r2)
+    fits, scores, comps = make_all_plots(results, args.output_dir,
+                                         min_r2=args.min_r2)
 
     summary = {
         'critical_line_fits': {
@@ -221,6 +221,21 @@ def main():
         },
         'collapse_scores': {
             f'H{H}_L{L}': float(s['score']) for (H, L), s in (scores or {}).items()
+        },
+        'model_comparison': {
+            f'H{H}_L{L}': {
+                'delta_AIC': c['delta_AIC'],
+                'delta_BIC': c['delta_BIC'],
+                'p_b': c['model_A']['p_b'],
+                't_b': c['model_A']['t_b'],
+                'b': c['model_A']['b'],
+                'b_se': c['model_A']['b_se'],
+                'ci95_b': [c['model_A']['ci95_b_lo'], c['model_A']['ci95_b_hi']],
+                'nu_A': c['model_A']['c'],
+                'nu_B': c['model_B']['c'],
+                'nu_B_se': c['model_B']['c_se'],
+            }
+            for (H, L), c in (comps or {}).items()
         },
     }
     summary_path = os.path.join(args.output_dir, 'analysis_summary.json')
@@ -255,6 +270,30 @@ def main():
                 cutoff = f.get('sigma_cutoff')
                 parts.append(f"fit_window<= {fmax:.2f}  SG_line={cutoff:.2f}")
             print("    " + "  ".join(parts))
+
+    if comps:
+        print("\n  Model comparison  [Model A: a+b*sigma+c*sigma^2  vs"
+              "  Model B: a+c*sigma^2  (SK null b=0)]:")
+        print(f"    {'Cell':12s}  {'b':>8s}  {'b_se':>8s}  {'t_b':>7s}"
+              f"  {'p(b=0)':>9s}  {'ΔAIC':>7s}  {'ΔBIC':>7s}  verdict")
+        for (H, L), c in sorted(comps.items()):
+            b = c['model_A']['b']
+            b_se = c['model_A']['b_se']
+            t_b = c['model_A']['t_b']
+            p_b = c['model_A']['p_b']
+            daic = c['delta_AIC']
+            dbic = c['delta_BIC']
+            p_str = f"{p_b:.3f}" if p_b >= 0.001 else f"{p_b:.2e}"
+            # Simple verdict: Model B parsimonious when |ΔAIC|<2 or ΔAIC<0
+            if daic < -2:
+                verdict = "A strongly preferred (linear term matters)"
+            elif daic < 2:
+                verdict = "indistinguishable (b=0 defensible)"
+            else:
+                verdict = "B preferred (simpler, b=0 OK)"
+            print(f"    H={H:3d} L={L:2d}    "
+                  f"{b:+8.4f}  {b_se:8.4f}  {t_b:+7.2f}"
+                  f"  {p_str:>9s}  {daic:+7.2f}  {dbic:+7.2f}  {verdict}")
 
 
 if __name__ == '__main__':
