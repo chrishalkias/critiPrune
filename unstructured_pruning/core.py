@@ -56,20 +56,25 @@ def evaluate_masked_accuracy(model, X_test, y_test, mask_sets):
     X_t = torch.as_tensor(X_test, dtype=dtype, device=device)
     y_np = np.asarray(y_test)
 
+    was_training = model.training
     model.eval()
-    with torch.no_grad():
-        normal_acc = float((model(X_t).argmax(1).cpu().numpy() == y_np).mean())
+    try:
+        with torch.no_grad():
+            normal_acc = float((model(X_t).argmax(1).cpu().numpy() == y_np).mean())
 
-    accs = {}
-    for s, seed_masks in mask_sets.items():
-        per_seed = []
-        for masks in seed_masks:
-            pruned = apply_mask(model, masks)
-            pruned.eval()
-            with torch.no_grad():
-                pred = pruned(X_t).argmax(1).cpu().numpy()
-            per_seed.append(float((pred == y_np).mean()))
-        accs[float(s)] = (float(np.mean(per_seed)), float(np.std(per_seed)))
+        accs = {}
+        for s, seed_masks in mask_sets.items():
+            per_seed = []
+            for masks in seed_masks:
+                pruned = apply_mask(model, masks)
+                pruned.eval()
+                with torch.no_grad():
+                    pred = pruned(X_t).argmax(1).cpu().numpy()
+                per_seed.append(float((pred == y_np).mean()))
+            accs[float(s)] = (float(np.mean(per_seed)), float(np.std(per_seed)))
+    finally:
+        if was_training:
+            model.train()
     return accs, normal_acc
 
 
