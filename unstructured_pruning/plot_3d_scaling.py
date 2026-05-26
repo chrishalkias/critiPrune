@@ -207,6 +207,12 @@ def render_3d(results, scaling, output_path, dataset_method=''):
     cnorm = Normalize(vmin=_log10(z_norm_lo), vmax=_log10(z_norm_hi))
 
     # ---- LEFT: empirical manifold from the data --------------------------
+    # Render order matters in 3D: plot_trisurf occludes anything drawn
+    # before it.  We split each error bar into a lower half (drawn BEFORE
+    # the surface) and an upper half (drawn AFTER) so the manifold sits
+    # between the two halves and the upper bars stay visible above it.
+
+    # ---- LEFT: empirical manifold from the data --------------------------
     tri = mtri.Triangulation(Hl, L)
     ax_data.plot_trisurf(tri, sl, cmap=cmap, norm=cnorm,
                          edgecolor='black', linewidth=0.25,

@@ -50,11 +50,20 @@ def _adj_r2(y, y_pred, n_fit_params):
 def fit_param_scaling(P_arr, s0_arr):
     """Fit s_0 = a * P^phi in log-log space.
 
+    Filters out non-positive ``s_0`` or ``P`` entries before taking logs,
+    since a sigmoid fit can return ``s_0 = 0`` at the bound and ``log(0)``
+    would silently propagate NaN through the whole fit.
+
     Returns (phi, a, r2_adj) where phi and a are the power-law exponent and
     prefactor, and r2_adj is the adjusted R² computed in log space.
     """
-    log_P  = np.log(P_arr)
-    log_s0 = np.log(s0_arr)
+    P_arr = np.asarray(P_arr, dtype=float)
+    s0_arr = np.asarray(s0_arr, dtype=float)
+    valid = (P_arr > 0) & (s0_arr > 0) & np.isfinite(P_arr) & np.isfinite(s0_arr)
+    if valid.sum() < 2:
+        return float('nan'), float('nan'), float('nan')
+    log_P  = np.log(P_arr[valid])
+    log_s0 = np.log(s0_arr[valid])
     phi, log_a = np.polyfit(log_P, log_s0, 1)
     a = np.exp(log_a)
     log_s0_pred = phi * log_P + log_a
