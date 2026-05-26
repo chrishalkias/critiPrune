@@ -55,7 +55,6 @@ from mnist_scaling import (
     evaluate_pruned_accuracy,
     exp_fn,
     fit_exponential,
-    _sparsify,
     fit_scaling_laws as mnist_fit_scaling_laws,
     make_scaling_plots,
 )
@@ -369,26 +368,26 @@ class TestExponentialFit:
 class TestSparsify:
 
     def test_sparsify_keeps_k_elements(self):
-        """_sparsify should keep exactly K largest-magnitude entries per row."""
+        """_sparsify_dynamic should keep exactly K largest-magnitude entries per row."""
         rng = np.random.default_rng(42)
         mat = rng.standard_normal((10, 20))
-        result = _sparsify(mat, k=5, H=20)
+        result = _sparsify_dynamic(mat, K=5)
         for row in result:
             assert np.count_nonzero(row) == 5
 
     def test_sparsify_preserves_top_values(self):
         """The retained entries should be the K largest by magnitude."""
         mat = np.array([[1, -5, 3, -2, 4]])
-        result = _sparsify(mat, k=2, H=5)
+        result = _sparsify_dynamic(mat, K=2)
         # Top-2 by magnitude: -5 and 4
         assert result[0, 1] == -5.0
         assert result[0, 4] == 4.0
         assert np.count_nonzero(result) == 2
 
     def test_sparsify_k_ge_H_is_identity(self):
-        """When K >= H, _sparsify returns the input unchanged."""
+        """When K >= H, _sparsify_dynamic returns the input unchanged."""
         mat = np.random.randn(3, 5)
-        result = _sparsify(mat, k=5, H=5)
+        result = _sparsify_dynamic(mat, K=5)
         np.testing.assert_array_equal(result, mat)
 
     def test_sparsify_dynamic_3d(self):
@@ -707,8 +706,11 @@ class TestMNISTScalingPlots:
         with tempfile.TemporaryDirectory() as tmpdir:
             mnist_scaling.OUTPUT_DIR = tmpdir
             try:
-                paths = make_scaling_plots(results, {'K0': {'a': 0.4, 'alpha': 1.0, 'gamma': 0.0}})
-                assert len(paths) == 3
+                paths = make_scaling_plots(
+                    results,
+                    {'K0': {'a': 0.4, 'alpha': 1.0, 'gamma': 0.0, 'R2': 0.95}},
+                )
+                assert len(paths) == 2
                 for p in paths:
                     assert os.path.isfile(p)
             finally:
@@ -741,7 +743,7 @@ class TestCIFARPlots:
         with tempfile.TemporaryDirectory() as tmpdir:
             scaling = cifar_fit_scaling_laws(results)
             paths = cifar_make_plots(results, scaling, tmpdir)
-            assert len(paths) == 3
+            assert len(paths) == 2
             for p in paths:
                 assert os.path.isfile(p)
 
@@ -772,6 +774,85 @@ class TestRegistry:
             assert m in METHOD_STYLE
             assert 'color' in METHOD_STYLE[m]
             assert 'marker' in METHOD_STYLE[m]
+
+
+# ---------------------------------------------------------------------------
+#  23. Regression: evaluate_masked_accuracy preserves training mode
+# ---------------------------------------------------------------------------
+
+class TestEvalMaskedAccuracyPreservesTrainingMode:
+    """Guard for the Phase-3 patch: source model's `training` flag must
+    round-trip through evaluate_masked_accuracy."""
+
+    def _setup(self):
+        import sys, os
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if repo_root not in sys.path:
+            sys.path.insert(0, repo_root)
+        from unstructured_pruning.core import evaluate_masked_accuracy
+        from unstructured_pruning.methods import magnitude_masks
+        m = FCNetwork(input_size=8, hidden_size=4, num_hidden_layers=2,
+                      num_classes=3, seed=0)
+        X = np.random.randn(20, 8).astype(np.float32)
+        y = np.random.randint(0, 3, size=20)
+        masks = magnitude_masks(m, [0.5, 1.0], n_seeds=1, base_seed=0)
+        return evaluate_masked_accuracy, m, X, y, masks
+
+    def test_eval_mode_preserved(self):
+        eval_fn, m, X, y, masks = self._setup()
+        m.eval()
+        eval_fn(m, X, y, masks)
+        assert m.training is False
+
+    def test_train_mode_preserved(self):
+        eval_fn, m, X, y, masks = self._setup()
+        m.train()
+        eval_fn(m, X, y, masks)
+        assert m.training is True
+
+
+# ---------------------------------------------------------------------------
+#  24. Regression: fit_param_scaling handles non-positive s_0
+# ---------------------------------------------------------------------------
+
+class TestFitParamScalingRobustness:
+    """Guard for the Phase-4 patch: log-log OLS must drop non-positive
+    entries instead of silently returning NaN for the whole fit."""
+
+    def _import(self):
+        import sys, os
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if repo_root not in sys.path:
+            sys.path.insert(0, repo_root)
+        from unstructured_pruning.param_scaling import fit_param_scaling
+        return fit_param_scaling
+
+    def test_clean_data(self):
+        fit = self._import()
+        P = np.array([1e3, 1e4, 1e5, 1e6])
+        s0 = 0.5 * P ** -0.15
+        phi, a, r2 = fit(P, s0)
+        np.testing.assert_allclose(phi, -0.15, atol=1e-6)
+        np.testing.assert_allclose(a, 0.5, atol=1e-6)
+        assert r2 > 0.999
+
+    def test_drops_zero_entries(self):
+        fit = self._import()
+        P = np.array([1e3, 1e4, 1e5, 1e6])
+        s0 = np.array([0.5, 0.1, 0.01, 0.0])  # one invalid → 3 valid points
+        phi, a, r2 = fit(P, s0)
+        assert np.isfinite(phi) and np.isfinite(a) and np.isfinite(r2)
+
+    def test_all_invalid_returns_nan_triplet(self):
+        fit = self._import()
+        phi, a, r2 = fit(np.array([1e3, 1e4]), np.array([0.0, -0.1]))
+        assert np.isnan(phi) and np.isnan(a) and np.isnan(r2)
+
+    def test_one_valid_point_returns_nan(self):
+        """Need ≥2 finite points to define a line."""
+        fit = self._import()
+        phi, a, r2 = fit(np.array([1e3, 1e4]), np.array([0.5, 0.0]))
+        assert np.isnan(phi) and np.isnan(a) and np.isnan(r2)
 
 
 # ---------------------------------------------------------------------------

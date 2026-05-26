@@ -552,11 +552,26 @@ def fit_sigmoid(k_values, accuracies, normal_acc):
     acc_arr = np.array([accuracies[k] for k in k_values])
 
     try:
+        # Data-driven initial guess for beta: scale the largest interior
+        # secant slope by the dynamic range so the optimiser starts near
+        # the true steepness instead of stalling at 0.2.
+        A_hi = max(float(acc_arr.max()), float(normal_acc))
+        A_lo = max(float(acc_arr.min()), 0.0)
+        span = max(A_hi - A_lo, 1e-3)
+        dk = np.diff(k_arr)
+        # Guard against duplicate / zero-width x samples.
+        valid = dk > 0
+        if valid.any():
+            slopes = np.abs(np.diff(acc_arr)[valid] / dk[valid])
+            s_max = float(slopes.max())
+        else:
+            s_max = 0.2
+        beta0 = float(np.clip(4.0 * s_max / span, 0.2, 100.0))
         p0 = [normal_acc, float(np.min(acc_arr)),
-              float(np.median(k_arr)), 0.2]
+              float(np.median(k_arr)), beta0]
         bounds = (
             [0.0, -0.05, 0.0, 1e-4],
-            [1.0,  1.0,  float(max(k_arr)) * 2, 20.0],
+            [1.0,  1.0,  float(max(k_arr)) * 2, 200.0],
         )
         popt, pcov = curve_fit(sigmoid_fn, k_arr, acc_arr, p0=p0,
                                bounds=bounds, maxfev=30_000)
