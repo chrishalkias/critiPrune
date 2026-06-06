@@ -224,6 +224,10 @@ def main():
         },
         'model_comparison': {
             f'H{H}_L{L}': {
+                'sigma_cutoff': c['sigma_cutoff'],
+                'cutoff_method': c.get('cutoff_method', 'unknown'),
+                'J0_eff': c.get('J0_eff_iter'),
+                'n_F': c['model_A']['n'],
                 'delta_AIC': c['delta_AIC'],
                 'delta_BIC': c['delta_BIC'],
                 'p_b': c['model_A']['p_b'],
@@ -272,28 +276,36 @@ def main():
             print("    " + "  ".join(parts))
 
     if comps:
-        print("\n  Model comparison  [Model A: a+b*sigma+c*sigma^2  vs"
-              "  Model B: a+c*sigma^2  (SK null b=0)]:")
-        print(f"    {'Cell':12s}  {'b':>8s}  {'b_se':>8s}  {'t_b':>7s}"
-              f"  {'p(b=0)':>9s}  {'ΔAIC':>7s}  {'ΔBIC':>7s}  verdict")
+        any_meth = next(iter(comps.values())).get('cutoff_method', 'unknown')
+        print(f"\n  Model comparison  [Model A: a+b*sigma+c*sigma^2  vs"
+              f"  Model B: a+c*sigma^2  (SK null b=0)]")
+        print(f"  F-regime cutoff method: {any_meth}")
+        print(f"  (cutoff sigma_th defined by where sigmoid steepness beta(sigma_th)"
+              f" has dropped to 70% of its sigma=0 baseline)")
+        print(f"    {'Cell':12s}  {'n_F':>4s}  {'sigma_cut':>9s}  {'J0_eff':>7s}"
+              f"  {'b':>8s}  {'t_b':>7s}  {'p(b=0)':>9s}"
+              f"  {'ΔAIC':>7s}  {'ΔBIC':>7s}  verdict")
         for (H, L), c in sorted(comps.items()):
             b = c['model_A']['b']
-            b_se = c['model_A']['b_se']
             t_b = c['model_A']['t_b']
             p_b = c['model_A']['p_b']
+            n_F = c['model_A']['n']
+            cut = c['sigma_cutoff']
+            j0 = c.get('J0_eff_iter', float('nan'))
+            j0_s = f"{j0:.3f}" if (j0 is not None and j0 == j0) else '   nan'
             daic = c['delta_AIC']
             dbic = c['delta_BIC']
             p_str = f"{p_b:.3f}" if p_b >= 0.001 else f"{p_b:.2e}"
-            # Simple verdict: Model B parsimonious when |ΔAIC|<2 or ΔAIC<0
-            if daic < -2:
-                verdict = "A strongly preferred (linear term matters)"
-            elif daic < 2:
+            # ΔAIC = AIC_B - AIC_A: positive => B worse => A (linear) preferred.
+            if daic > 2:
+                verdict = "A preferred (linear term significant)"
+            elif daic > -2:
                 verdict = "indistinguishable (b=0 defensible)"
             else:
-                verdict = "B preferred (simpler, b=0 OK)"
-            print(f"    H={H:3d} L={L:2d}    "
-                  f"{b:+8.4f}  {b_se:8.4f}  {t_b:+7.2f}"
-                  f"  {p_str:>9s}  {daic:+7.2f}  {dbic:+7.2f}  {verdict}")
+                verdict = "B preferred (b=0 parsimonious)"
+            print(f"    H={H:3d} L={L:2d}   {n_F:4d}  {cut:9.3f}  {j0_s:>7s}"
+                  f"  {b:+8.4f}  {t_b:+7.2f}  {p_str:>9s}"
+                  f"  {daic:+7.2f}  {dbic:+7.2f}  {verdict}")
 
 
 if __name__ == '__main__':

@@ -332,6 +332,148 @@ def collapse_score(results, sigma_min=1e-6, n_grid=40, min_r2=0.80):
 
 
 # ---------------------------------------------------------------------------
+# Beta-collapse F-regime cutoff (data-driven thermalisation detector)
+# ---------------------------------------------------------------------------
+
+def _beta_collapse_cutoff(sigmas, betas, ratio=0.7, sigma_baseline_max=0.05):
+    """Data-driven F-regime boundary from the sigmoid steepness β(σ).
+
+    In the F regime the accuracy curve A(s) is steep, so the fitted sigmoid
+    has large steepness β.  As σ approaches J_0 the transition smears out
+    and β collapses; the network is no longer in a clean ordered phase.
+    Concretely: find the largest σ such that β(σ) ≥ ``ratio`` × β(σ≈0).
+
+    Unlike the polynomial-R² criterion (``_residual_based_F_regime_fit``)
+    this responds to a directly observed physical signal — the smearing of
+    the pruning transition — not to the fit quality of p_c(σ).  p_c can
+    look smooth long after β has collapsed.
+
+    Parameters
+    ----------
+    sigmas, betas : array-like (same length)
+        Sigmoid steepness β paired with the σ value at which it was measured.
+    ratio : float in (0, 1)
+        Fraction of the σ→0 baseline β at which the F regime ends.
+        Default 0.7 (β has dropped by 30%) — sensitive to early smearing of
+        the transition; tighter than half-collapse but not arbitrary.
+    sigma_baseline_max : float
+        Window over which the baseline β(σ≈0) is averaged for robustness.
+
+    Returns
+    -------
+    sigma_cutoff : float
+        Largest σ within the F regime.  Returns max(sigmas) when β never
+        drops below the threshold across the swept range.
+    """
+    sigmas = np.asarray(sigmas, dtype=float)
+    betas = np.asarray(betas, dtype=float)
+    order = np.argsort(sigmas)
+    sigmas_s = sigmas[order]
+    betas_s = betas[order]
+    if len(sigmas_s) < 2:
+        return float(sigmas_s[-1]) if len(sigmas_s) > 0 else 0.0
+    base_mask = sigmas_s <= sigma_baseline_max + 1e-9
+    beta0 = float(np.mean(betas_s[base_mask])) if base_mask.any() else float(betas_s[0])
+    if not np.isfinite(beta0) or beta0 <= 0:
+        return float(sigmas_s[-1])
+    threshold = ratio * beta0
+    below = np.where(betas_s < threshold)[0]
+    if len(below) == 0:
+        return float(sigmas_s[-1])
+    first = int(below[0])
+    return float(sigmas_s[first - 1]) if first > 0 else 0.0
+
+
+# ---------------------------------------------------------------------------
+# Self-consistent F-regime cutoff
+# ---------------------------------------------------------------------------
+
+def _self_consistent_J0_cutoff(sigmas, p_cs, degree=2,
+                               initial_sigma_max=0.3,
+                               max_iters=25, tol=0.005,
+                               min_points=4):
+    """Self-consistent F-regime cutoff at sigma = J_0_eff.
+
+    The SK bond-disorder prediction places the F -> SG phase boundary at
+    sigma = J_0.  In practice J_0 is unknown a priori, but the quadratic
+    curvature c of p_c(sigma) inside the F regime *is* the SK estimate:
+    c = 1/(2 J_0^2)  =>  J_0_eff = 1/sqrt(2c).
+
+    Iteration:
+        cutoff_0  = initial_sigma_max  (a small-sigma bootstrap window)
+        Loop:
+            fit polynomial on sigma <= cutoff_k -> coefficients (a, b, c)
+            J_0_eff = 1 / sqrt(2c)
+            cutoff_{k+1} = min(J_0_eff, sigma_max_data)
+        until |cutoff_{k+1} - cutoff_k| / cutoff_k < tol  or  max_iters.
+
+    Compared to the running-R^2 cutoff used in ``_residual_based_F_regime_fit``,
+    this method is anchored to a physical scale (J_0_eff) rather than a
+    statistical fit-quality threshold, so it does NOT extend the fit window
+    into the thermalised regime simply because the polynomial happens to keep
+    fitting well there.  The thermalisation signature (sigmoid steepness beta
+    collapsing) is invisible to a polynomial-R^2 criterion but is captured
+    indirectly here: when noise grows beyond J_0, the SK prediction breaks
+    down and J_0_eff measured from the fit cannot exceed the data range.
+
+    Returns
+    -------
+    dict with the polynomial fit at the converged cutoff plus extra fields:
+        ``sigma_cutoff``  -- converged J_0-anchored cutoff.
+        ``J0_eff_iter``   -- 1/sqrt(2c) from the final fit.
+        ``restricted``    -- True if cutoff < max(sigmas).
+        ``n_iters``       -- iterations until convergence.
+        ``converged``     -- True if |delta cutoff| dropped below tol.
+    Returns ``None`` when the system cannot be fit (too few points, negative
+    curvature) -- the caller should fall back to the running-R^2 method.
+    """
+    sigmas = np.asarray(sigmas, dtype=float)
+    p_cs = np.asarray(p_cs, dtype=float)
+    sigma_max = float(sigmas.max())
+    cutoff = min(float(initial_sigma_max), sigma_max)
+    last_fit = None
+    converged = False
+
+    for it in range(max_iters):
+        mask = sigmas <= cutoff + 1e-9
+        n_in = int(mask.sum())
+        if n_in <= max(degree, min_points - 1):
+            return None
+        fit = _poly_fit(sigmas[mask], p_cs[mask], degree=degree)
+        if fit is None:
+            return None
+        last_fit = fit
+        j0 = _J0_from_curvature(fit['coeffs'])
+        if j0 is None or not np.isfinite(j0) or j0 <= 0:
+            # negative curvature -- the SK prediction is locally inverted;
+            # keep the current cutoff and stop.
+            break
+        new_cutoff = min(float(j0), sigma_max)
+        rel_change = abs(new_cutoff - cutoff) / max(cutoff, 1e-3)
+        cutoff = new_cutoff
+        if rel_change < tol:
+            converged = True
+            break
+
+    if last_fit is None:
+        return None
+    # Refit on the converged window so the returned coefficients match cutoff.
+    mask = sigmas <= cutoff + 1e-9
+    if int(mask.sum()) <= degree:
+        return None
+    final = _poly_fit(sigmas[mask], p_cs[mask], degree=degree)
+    if final is None:
+        return None
+    final['sigma_cutoff'] = float(cutoff)
+    final['sigma_fit_max'] = float(cutoff)
+    final['J0_eff_iter'] = _J0_from_curvature(final['coeffs'])
+    final['restricted'] = bool(cutoff < sigma_max - 1e-9)
+    final['n_iters'] = int(it + 1)
+    final['converged'] = bool(converged)
+    return final
+
+
+# ---------------------------------------------------------------------------
 # Model comparison: full quadratic vs. pure quadratic (no linear term)
 # ---------------------------------------------------------------------------
 
@@ -391,7 +533,9 @@ def _fit_no_linear(x, y):
 
 
 def fit_model_comparison(pc_by_cell, restrict_to_F_regime=True,
-                         initial_sigma_max=0.3):
+                         initial_sigma_max=0.3,
+                         cutoff_method='beta_collapse',
+                         beta_ratio=0.7):
     """Per-cell AIC/BIC model comparison and t-test for the linear coefficient.
 
     Compares two models fitted on the same F-regime sigma window:
@@ -403,24 +547,40 @@ def fit_model_comparison(pc_by_cell, restrict_to_F_regime=True,
     ΔAIC = AIC_B - AIC_A (< 2) and a non-significant p-value for b support
     Model B as the parsimonious description.
 
-    The F-regime window is determined identically to ``fit_critical_line``
-    (running-R² cutoff from ``_residual_based_F_regime_fit``), so both models
-    are compared on exactly the same data points — no circularity between the
-    window choice and the coefficient estimates, because the window uses the
-    full-quadratic R² and is finalized *before* computing AIC/t-test.
+    F-regime window options (``cutoff_method``):
+
+    - ``'beta_collapse'`` (default):  largest sigma such that the fitted
+      sigmoid steepness beta(sigma) is at least ``beta_ratio`` * beta(sigma=0).
+      This responds to a directly observed physical signal -- the smearing of
+      the pruning transition -- which is the actual definition of
+      thermalisation in this setup.  ``beta_ratio=0.7`` (30% drop) is the
+      default; the result is not strongly sensitive to the precise threshold.
+
+    - ``'J0_self_consistent'``:  iteratively cap the window at sigma <= J_0_eff,
+      where J_0_eff = 1/sqrt(2c) is extracted from the quadratic curvature.
+      This is the SK phase boundary, but J_0_eff itself is biased upward when
+      the fit window includes thermalised data, so it under-restricts in
+      practice.
+
+    - ``'R2_drop'``:  legacy running-R^2 cutoff (same as ``fit_critical_line``).
+      Risk: the polynomial may fit beyond thermalisation because p_c continues
+      to behave smoothly while the sigmoid steepness collapses.
 
     Parameters
     ----------
     pc_by_cell : dict from ``group_pc_by_cell``
     restrict_to_F_regime : bool
-        If True (default), truncate to the iterative F-regime window.
+        If True (default), truncate to the data-driven F-regime window.
     initial_sigma_max : float
-        Bootstrap window for the running-R² cutoff.
+        Small-sigma bootstrap window seeding the iterative J_0 cutoff.
+    cutoff_method : {'J0_self_consistent', 'R2_drop'}
 
     Returns
     -------
     dict {(H, L): {
         'sigma_cutoff': float,
+        'cutoff_method': str,
+        'J0_eff_iter': float,
         'sigmas': list[float],
         'p_cs': list[float],
         'model_A': dict,        # full quadratic fit + t-test fields
@@ -434,24 +594,63 @@ def fit_model_comparison(pc_by_cell, restrict_to_F_regime=True,
     out = {}
     for (H, L), entries in pc_by_cell.items():
         by_sigma_vals = defaultdict(list)
-        for (sigma, s0, _s0_std, _beta, _r2, _rep) in entries:
+        by_sigma_betas = defaultdict(list)
+        for (sigma, s0, _s0_std, beta, _r2, _rep) in entries:
             by_sigma_vals[float(sigma)].append(s0)
+            by_sigma_betas[float(sigma)].append(float(beta))
         sigmas_all = sorted(by_sigma_vals)
         p_cs_all = [float(np.mean(by_sigma_vals[s])) for s in sigmas_all]
+        betas_all = [float(np.mean(by_sigma_betas[s])) for s in sigmas_all]
 
         if len(sigmas_all) < 4:
             continue
 
+        j0_eff = None
         if restrict_to_F_regime:
-            window_fit = _residual_based_F_regime_fit(
-                sigmas_all, p_cs_all, degree=2,
-                initial_sigma_max=initial_sigma_max,
-            )
-            if window_fit is None:
-                continue
-            cutoff = float(window_fit['sigma_cutoff'])
+            if cutoff_method == 'beta_collapse':
+                cutoff = _beta_collapse_cutoff(sigmas_all, betas_all,
+                                               ratio=beta_ratio)
+                used_method = f'beta_collapse(ratio={beta_ratio})'
+                # Compute J_0_eff post-hoc from the F-regime polynomial fit.
+                _mask = np.array(sigmas_all) <= cutoff + 1e-9
+                _x = np.array(sigmas_all)[_mask]
+                _y = np.array(p_cs_all)[_mask]
+                if len(_x) > 2:
+                    _f = _poly_fit(_x, _y, degree=2)
+                    if _f is not None:
+                        j0_eff = _J0_from_curvature(_f['coeffs'])
+            elif cutoff_method == 'J0_self_consistent':
+                window_fit = _self_consistent_J0_cutoff(
+                    sigmas_all, p_cs_all, degree=2,
+                    initial_sigma_max=initial_sigma_max,
+                )
+                if window_fit is None:
+                    window_fit = _residual_based_F_regime_fit(
+                        sigmas_all, p_cs_all, degree=2,
+                        initial_sigma_max=initial_sigma_max,
+                    )
+                    used_method = 'R2_drop_fallback'
+                else:
+                    used_method = 'J0_self_consistent'
+                if window_fit is None:
+                    continue
+                cutoff = float(window_fit['sigma_cutoff'])
+                j0_eff = window_fit.get('J0_eff_iter')
+            elif cutoff_method == 'R2_drop':
+                window_fit = _residual_based_F_regime_fit(
+                    sigmas_all, p_cs_all, degree=2,
+                    initial_sigma_max=initial_sigma_max,
+                )
+                used_method = 'R2_drop'
+                if window_fit is None:
+                    continue
+                cutoff = float(window_fit['sigma_cutoff'])
+                j0_eff = window_fit.get('J0_eff_iter')
+            else:
+                raise ValueError(f"Unknown cutoff_method: {cutoff_method}")
         else:
             cutoff = float(sigmas_all[-1])
+            used_method = 'none'
 
         # Select the F-regime points (same for both models).
         mask = np.array(sigmas_all) <= cutoff + 1e-9
@@ -489,6 +688,8 @@ def fit_model_comparison(pc_by_cell, restrict_to_F_regime=True,
 
         out[(H, L)] = {
             'sigma_cutoff': cutoff,
+            'cutoff_method': used_method,
+            'J0_eff_iter': float(j0_eff) if (j0_eff is not None and np.isfinite(j0_eff)) else float('nan'),
             'sigmas': x.tolist(),
             'p_cs': y.tolist(),
             'model_A': fa,

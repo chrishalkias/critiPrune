@@ -327,6 +327,17 @@ def plot_model_comparison(results, output_path, min_r2=0.80):
         print("  [model_comparison] no fits -- skip")
         return None
 
+    # Build a lookup of the full p_c(sigma) per cell so we can also draw
+    # the SG-regime points (faintly) outside the F-regime window.
+    full_pc = group_pc_by_cell(results, min_r2=min_r2)
+    full_per_cell = {}
+    for (H, L), entries in full_pc.items():
+        rows = sorted(entries, key=lambda e: e[0])
+        full_per_cell[(H, L)] = (
+            np.array([e[0] for e in rows]),
+            np.array([e[1] for e in rows]),
+        )
+
     cells = sorted(comps)
     # Reserve one extra panel for the ν summary.
     n_panels = len(cells) + 1
@@ -348,7 +359,22 @@ def plot_model_comparison(results, output_path, min_r2=0.80):
         y = np.array(d['p_cs'])
         sigma_cutoff = d['sigma_cutoff']
 
-        # Scatter: F-regime data.
+        # Full data range for shading the SG/thermalised region.
+        sigmas_full, pcs_full = full_per_cell.get(cell, (x, y))
+        sigma_max = float(sigmas_full.max())
+        in_F = sigmas_full <= sigma_cutoff + 1e-9
+        # Shade SG region.
+        if sigma_cutoff < sigma_max:
+            ax.axvspan(sigma_cutoff, sigma_max * 1.02,
+                       facecolor='lightgray', alpha=0.35, zorder=0)
+            ax.axvline(sigma_cutoff, color='dimgray', ls='--', lw=1.0,
+                       alpha=0.85, zorder=1)
+            # Excluded thermalised data: faint x markers.
+            ax.scatter(sigmas_full[~in_F], pcs_full[~in_F],
+                       s=15, color='gray', alpha=0.45, marker='x',
+                       zorder=3, label=r'SG / thermalised (excluded)')
+
+        # Scatter: F-regime data used in both fits.
         ax.scatter(x, y, s=20, color='C0', zorder=5,
                    edgecolor='black', linewidth=0.4, label='$p_c$ (F-regime)')
 
@@ -415,8 +441,8 @@ def plot_model_comparison(results, output_path, min_r2=0.80):
         r'Model comparison: $p_c = a + b\sigma + c\sigma^2$ (A)  vs  '
         r'$p_c = a + c\sigma^2$ (B, SK null)'
         '\n'
-        r'$\Delta$AIC $= $ AIC$_B -$ AIC$_A > 0$ favours A; '
-        r'$|\Delta\text{AIC}| < 2$ means indistinguishable',
+        r'$\Delta$AIC $=$ AIC$_B -$ AIC$_A$:  $>0$ favours Model A (linear term helps); '
+        r'$|\Delta\text{AIC}| < 2$ indistinguishable; $<0$ favours Model B (SK null)',
         fontsize=10,
     )
     fig.tight_layout()

@@ -102,10 +102,17 @@ def _load_torchvision():
 
 
 def _load_sklearn():
-    """Fallback: load MNIST via sklearn fetch_openml."""
+    """Fallback: load MNIST via sklearn fetch_openml.
+
+    ``parser='liac-arff'`` is used explicitly because ``parser='auto'``
+    requires ``pandas``, which is not part of the project's hard
+    dependency set. liac-arff is bundled with scikit-learn and needs
+    no extra install.
+    """
     from sklearn.datasets import fetch_openml
     print("  Downloading MNIST via fetch_openml (may take a while)...")
-    mnist = fetch_openml('mnist_784', version=1, as_frame=False, parser='auto')
+    mnist = fetch_openml('mnist_784', version=1, as_frame=False,
+                         parser='liac-arff')
     X = mnist.data.astype(np.float64)
     y = mnist.target.astype(int)
     X_tr, X_te = X[:60000], X[60000:]
