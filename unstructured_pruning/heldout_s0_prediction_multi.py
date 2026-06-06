@@ -66,10 +66,10 @@ def run(label, X_te, y_te, ckdir, jsonp, n_test):
 from pruning.mnist_scaling import load_data
 _,_,Xs,_,_,ys=load_data()
 run('sklearn', Xs, ys, 'unstructured_pruning/checkpoints/unstructured_figures_sklearn_random',
-    'unstructured_pruning/figures/unstructured_figures_sklearn_random/scaling_results.json', 3000)
+    'assets/unstructured_pruning/unstructured_figures_sklearn_random/scaling_results.json', 3000)
 # cifar resnet (download+extract features, cached)
 from pruning.cifar_scaling import load_cifar10
 _,_,Xc,_,_,yc=load_cifar10()
 run('cifar_resnet', Xc, yc, 'unstructured_pruning/checkpoints/unstructured_figures_cifar_resnet_random',
-    'unstructured_pruning/figures/unstructured_figures_cifar_resnet_random/scaling_results.json', 1500)
+    'assets/unstructured_pruning/unstructured_figures_cifar_resnet_random/scaling_results.json', 1500)
 print('DONE')

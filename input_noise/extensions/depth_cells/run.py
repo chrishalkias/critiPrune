@@ -3,7 +3,7 @@
 
 The ALICE cluster sweep already covered L in {3, 4, 5} on sklearn
 digits and MNIST-28 with random pruning (see
-``input_noise/figures_cluster/findings.md``). We re-use those joint
+``assets/input_noise/cluster/findings.md``). We re-use those joint
 grids directly — no retraining needed.
 
 For each (dataset, H, L) selection we extract iso-A contours at
@@ -14,7 +14,7 @@ A in {0.3, 0.5, 0.7, 0.9} via the same helper used in C1 and report:
     single-layer derivation predicts) is confirmed across the new
     cells.
 
-Writes input_noise/extensions/depth_cells/results.json.
+Writes assets/input_noise/extensions/depth_cells/results.json.
 
 Run::
 
@@ -37,7 +37,7 @@ if _ROOT not in sys.path:
 from input_noise.extensions._analysis import analyze_cell    # noqa: E402
 
 CLUSTER_JSON = 'input_noise/results_cluster_all.json'
-OUTPUT_JSON  = 'input_noise/extensions/depth_cells/results.json'
+OUTPUT_JSON  = 'assets/input_noise/extensions/depth_cells/results.json'
 ISO_LEVELS   = [0.30, 0.50, 0.70, 0.90]
 
 # 2-3 cells per L per dataset. Sklearn is cheaper and has L=2 baselines

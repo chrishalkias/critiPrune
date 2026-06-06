@@ -5,7 +5,7 @@ so the sigmoid slope parameter beta from
     A(s) = A_0 + (A_inf - A_0) / (1 + exp(-beta (s - s_0)))
 should decrease with sigma.
 
-Reads ``temperature_pruning/figures/<dataset>/results.json`` and writes
+Reads ``assets/temperature_pruning/<dataset>/results.json`` and writes
 ``beta_vs_sigma.png`` next to it.
 
 Usage:
@@ -202,7 +202,7 @@ def main():
                         'against its 20 upper bound.')
     args = p.parse_args()
 
-    base = f'temperature_pruning/figures/{args.dataset}'
+    base = f'assets/temperature_pruning/{args.dataset}'
     results_path = args.results_path or os.path.join(base, 'results.json')
     output_path = args.output_path or os.path.join(base, 'beta_vs_sigma.png')
 

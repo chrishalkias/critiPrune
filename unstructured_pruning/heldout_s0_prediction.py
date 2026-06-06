@@ -15,7 +15,7 @@ from pruning.mnist28_scaling import load_mnist28
 
 A_RAND = 0.1
 CKDIR = 'unstructured_pruning/checkpoints/unstructured_figures_mnist28_random'
-JSON  = 'unstructured_pruning/figures/unstructured_figures_mnist28_random/scaling_results.json'
+JSON  = 'assets/unstructured_pruning/unstructured_figures_mnist28_random/scaling_results.json'
 
 # ---- data (same preprocessing as training) ----
 X_tr, X_val, X_te, y_tr, y_val, y_te = load_mnist28()

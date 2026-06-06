@@ -2,7 +2,7 @@
 r"""Publication-quality 3D comparison plots: empirical vs. theoretical
 $s_0(H, L)$ manifolds.
 
-For each ``unstructured_pruning/figures/unstructured_figures_<dataset>_<method>``
+For each ``assets/unstructured_pruning/unstructured_figures_<dataset>_<method>``
 directory containing both ``scaling_results.json`` and ``scaling_laws.json``,
 this script writes ``s0_3d.png`` next to the existing 2D plots.
 
@@ -278,7 +278,7 @@ def render_3d(results, scaling, output_path, dataset_method=''):
 # ----------------------------------------------------------------------------
 # Entry point
 # ----------------------------------------------------------------------------
-def main(base='unstructured_pruning/figures'):
+def main(base='assets/unstructured_pruning'):
     have_latex = _configure_style()
     print(f'  Rendering with text.usetex = {have_latex}')
 
@@ -308,7 +308,7 @@ def main(base='unstructured_pruning/figures'):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument('--base', default='unstructured_pruning/figures',
+    ap.add_argument('--base', default='assets/unstructured_pruning',
                     help='directory containing unstructured_figures_* subdirs')
     args = ap.parse_args()
     main(base=args.base)

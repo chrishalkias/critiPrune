@@ -10,7 +10,7 @@ For each (dataset, H, L) cell we
      unpruned model;
   4. sweep the joint (s, sigma) grid;
   5. fit sigmoids to the two 1-D sweeps and dump everything to
-     ``input_noise/results.json``.
+     ``assets/input_noise/pilot/results.json``.
 
 The downstream plots and writeup consume only that JSON; this driver
 is the only thing that touches torch.
@@ -75,7 +75,7 @@ BS_MNIST28     = 256
 LR             = 1e-3
 SEED           = 42
 
-OUTPUT_JSON = 'input_noise/results.json'
+OUTPUT_JSON = 'assets/input_noise/pilot/results.json'
 CKPT_DIR    = 'input_noise/checkpoints'
 
 

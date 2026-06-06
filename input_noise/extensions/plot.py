@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Plots for the §5.2 extensions (C1, C3, C5).
 
-Reads the three results.json under input_noise/extensions/{iso_levels,
+Reads the three results.json under assets/input_noise/extensions/{iso_levels,
 depth_cells, seed_replicates}/ and emits
 
   - extensions/collapse_multi_iso.png  parameter-free (xi, eta) collapse
@@ -33,7 +33,7 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-EXT = 'input_noise/extensions'
+EXT = 'assets/input_noise/extensions'
 
 ISO_COLORS = {0.30: '#1f77b4', 0.50: '#2ca02c',
               0.70: '#d62728', 0.90: '#9467bd'}

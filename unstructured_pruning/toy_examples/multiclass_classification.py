@@ -373,7 +373,7 @@ def main():
                     help='upper bound on u; s_max = u^2 / (1 + u^2)')
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--output-dir',
-                    default='unstructured_pruning/toy_examples/figures/multiclass')
+                    default='assets/unstructured_pruning/toy_examples/multiclass')
     args = ap.parse_args()
 
     have_latex = _configure_style()

@@ -15,7 +15,7 @@ Smoke test (single cell, three sigmas):
     python -m temperature_pruning.main --dataset sklearn \\
         --h-values 32 --l-values 3 --sigmas 0.0 0.05 0.1 \\
         --n-mask-seeds 2 --n-noise-seeds 2 \\
-        --output-dir temperature_pruning/figures/smoke
+        --output-dir assets/temperature_pruning/smoke
 """
 
 from __future__ import annotations
@@ -163,7 +163,7 @@ def parse_args():
     if args.ckpt_dir is None:
         args.ckpt_dir = cfg['ckpt_dir']
     if args.output_dir is None:
-        args.output_dir = f"temperature_pruning/figures/{cfg['output_subdir']}"
+        args.output_dir = f"assets/temperature_pruning/{cfg['output_subdir']}"
     if args.h_values is None:
         args.h_values = list(cfg['default_h'])
     if args.l_values is None:

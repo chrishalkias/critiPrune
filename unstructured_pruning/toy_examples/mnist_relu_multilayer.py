@@ -375,7 +375,7 @@ def main():
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--data-dir', default=DEFAULT_MNIST_DIR)
     ap.add_argument('--output-dir',
-                    default='unstructured_pruning/toy_examples/figures/mnist_relu')
+                    default='assets/unstructured_pruning/toy_examples/mnist_relu')
     args = ap.parse_args()
 
     have_latex = _configure_style()

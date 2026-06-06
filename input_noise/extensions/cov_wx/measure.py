@@ -93,7 +93,7 @@ def load_extension_cells():
 
 
 def main():
-    # 1. baseline 5 cells from input_noise/results.json
+    # 1. baseline 5 cells from assets/input_noise/pilot/results.json
     with open(RESULTS_JSON) as f:
         baseline = json.load(f)
     extras = load_extension_cells()

@@ -6,7 +6,7 @@ Sibling of ``plot_3d_scaling.py``. Reuses the ``render_3d`` rendering
 function from that module after swapping the aggregation field names
 and re-fitting the s_0 = a H^alpha L^gamma power law on v2 data.
 
-Writes outputs to ``unstructured_pruning/figures/unstructured_figures_*/
+Writes outputs to ``assets/unstructured_pruning/unstructured_figures_*/
 s0_3d_v2.png`` (sibling of the v1 ``s0_3d.png``).
 """
 from __future__ import annotations
@@ -84,7 +84,7 @@ def _powerlaw_v2(rows, min_r2=0.80):
         return None
 
 
-def main(base_dir='unstructured_pruning/figures'):
+def main(base_dir='assets/unstructured_pruning'):
     have_latex = base._configure_style()
     print(f'  Rendering with text.usetex = {have_latex}')
 
@@ -119,6 +119,6 @@ def main(base_dir='unstructured_pruning/figures'):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument('--base', default='unstructured_pruning/figures')
+    ap.add_argument('--base', default='assets/unstructured_pruning')
     args = ap.parse_args()
     main(base_dir=args.base)

@@ -56,7 +56,7 @@ BS_DIGITS      = 64
 BS_MNIST28     = 256
 LR             = 1e-3
 
-OUTPUT_JSON = 'input_noise/extensions/seed_replicates/results.json'
+OUTPUT_JSON = 'assets/input_noise/extensions/seed_replicates/results.json'
 
 
 _DATA_CACHE = {}

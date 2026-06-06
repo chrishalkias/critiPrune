@@ -14,7 +14,7 @@ Usage
     python -m unstructured_pruning.more_combinations \\
         --dataset mnist28 --method random [--n-repeats 1]
 
-Outputs land in ``unstructured_pruning/figures/unstructured_figures_<dataset>_<method>/``
+Outputs land in ``assets/unstructured_pruning/unstructured_figures_<dataset>_<method>/``
 (same directory as the original scan), so plots and scaling-law fits get
 regenerated with the denser grid automatically.
 """
@@ -132,7 +132,7 @@ def main(dataset, method, output_dir=None, n_repeats=1,
 
     cfg = DATASETS[dataset]
     if output_dir is None:
-        output_dir = ('unstructured_pruning/figures/'
+        output_dir = ('assets/unstructured_pruning/'
                       f'unstructured_figures_{dataset}_{method}')
 
     H_values = sorted(set(cfg['H_base']) | set(cfg['H_extra']))

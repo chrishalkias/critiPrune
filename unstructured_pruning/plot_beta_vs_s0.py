@@ -17,7 +17,7 @@ is the effective signal-to-noise of the architecture; the shape
 :math:`\log\beta`, restricted to resolved (non-saturated) cells, and
 overlay the resulting curve.
 
-Each ``unstructured_pruning/figures/unstructured_figures_<dataset>_<method>``
+Each ``assets/unstructured_pruning/unstructured_figures_<dataset>_<method>``
 directory holds one ``scaling_results.json`` with one row per
 ``(H, L, repeat)`` cell, including the per-cell sigmoid fit parameters
 ``sigmoid_s_0`` and ``sigmoid_beta``. This script scatters
@@ -522,7 +522,7 @@ def render_grid(per_cell_data, output_path, *, have_latex):
     return output_path
 
 
-def main(base='unstructured_pruning/figures', min_r2=0.80):
+def main(base='assets/unstructured_pruning', min_r2=0.80):
     have_latex = _configure_style()
     print(f'  Rendering with text.usetex = {have_latex}')
 
@@ -565,7 +565,7 @@ def main(base='unstructured_pruning/figures', min_r2=0.80):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument('--base', default='unstructured_pruning/figures',
+    ap.add_argument('--base', default='assets/unstructured_pruning',
                     help='directory containing unstructured_figures_* subdirs')
     ap.add_argument('--min-r2', type=float, default=0.80,
                     help='minimum sigmoid R^2 to keep a cell')

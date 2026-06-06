@@ -47,7 +47,7 @@ from unstructured_pruning.methods import (                      # noqa: E402
 )
 
 CHECKPOINT_BASE = 'unstructured_pruning/checkpoints'
-OUTPUT_BASE     = 'unstructured_pruning/figures/method_comparison'
+OUTPUT_BASE     = 'assets/unstructured_pruning/method_comparison'
 
 # Dense density grid -> smooth A(s) curves.
 DEFAULT_DENSITIES = [round(v, 3) for v in np.linspace(0.02, 1.0, 25)]

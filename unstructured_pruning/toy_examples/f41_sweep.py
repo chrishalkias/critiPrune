@@ -427,7 +427,7 @@ def main():
     ds = DATASETS[args.dataset]
     data_dir = args.data_dir or ds['data_dir']
     output_dir = args.output_dir or (
-        f'unstructured_pruning/toy_examples/figures/'
+        f'assets/unstructured_pruning/toy_examples/'
         f'sweep_{args.dataset}_{args.method}')
     os.makedirs(output_dir, exist_ok=True)
 

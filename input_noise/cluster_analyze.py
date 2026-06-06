@@ -20,7 +20,7 @@ Reads ``input_noise/results_cluster_all.json`` (~4000 cells across 12
      ``RMS(eta - (1 - xi))`` across cells.
   4. Aggregate statistics by ``(dataset, method)`` and by ``(H, L)``.
 
-Outputs (``input_noise/figures_cluster/``):
+Outputs (``assets/input_noise/cluster/``):
   - ``collapse_all.png``      master parameter-free collapse (all cells)
   - ``collapse_by_method.png`` 3-panel collapse split by pruning method
   - ``r2_distribution.png``    histogram of per-cell R^2 (overall + by method)
@@ -61,7 +61,7 @@ if _ROOT not in sys.path:
 # Constants
 # ---------------------------------------------------------------------------
 INPUT_JSON   = 'input_noise/results_cluster_all.json'
-OUT_DIR      = 'input_noise/figures_cluster'
+OUT_DIR      = 'assets/input_noise/cluster'
 ISO_LEVEL    = 0.50
 
 # Datasets to drop before analysis. ``cifar_pca`` is excluded because the
@@ -1171,7 +1171,7 @@ def write_findings(records, xi, eta, groups, cell_ids,
                  '`L >= 4`) fail more visibly, but otherwise `H` is a weak axis.')
     lines.append('')
     lines.append('This is the **same depth-residual signature** documented in the '
-                 'F41 toy sweep (`unstructured_pruning/toy_examples/figures/'
+                 'F41 toy sweep (`assets/unstructured_pruning/toy_examples/'
                  'sweep_*/residuals.png`): the linearised single-layer SNR '
                  'derivation is exact at `L = 2`, deviates visibly by `L = 4`, '
                  'and is the dominant correction by `L >= 8`. The current '
@@ -1231,7 +1231,7 @@ def write_findings(records, xi, eta, groups, cell_ids,
     lines.append('')
     lines.append('## Outputs')
     lines.append('')
-    lines.append('Figures in `input_noise/figures_cluster/`:')
+    lines.append('Figures in `assets/input_noise/cluster/`:')
     lines.append('')
     lines.append('- `collapse_all.png`        two-panel: raw scatter (left) + two-stage cross-cell median (right)')
     lines.append('- `collapse_L2.png`         L=2 only — the strongest collapse test (framework is exact at L=2)')

@@ -37,7 +37,7 @@ from input_noise.cluster_analyze import iso_contour, fit_framework  # noqa: E402
 # Constants
 # ---------------------------------------------------------------------------
 INPUT_JSON      = 'input_noise/results_cluster_all.json'
-OUT_DIR         = 'input_noise/extensions/falsifiability'
+OUT_DIR         = 'assets/input_noise/extensions/falsifiability'
 ISO_LEVEL       = 0.50
 EXCLUDE         = {'cifar_pca'}
 NULL_EXPONENTS  = (0.5, 1.0, 2.0)

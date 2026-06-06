@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Plots and conversion-law fit for the input-noise iso-accuracy experiment.
 
-Reads ``input_noise/results.json`` produced by ``run_experiment.py`` and
+Reads ``assets/input_noise/pilot/results.json`` produced by ``run_experiment.py`` and
 emits
 
   - per-cell A(s) and A(sigma) side-by-side panels
@@ -30,8 +30,8 @@ import matplotlib.pyplot as plt
 from input_noise.core import iso_accuracy_contour
 
 
-RESULTS_PATH = 'input_noise/results.json'
-FIG_ROOT     = 'input_noise/figures'
+RESULTS_PATH = 'assets/input_noise/pilot/results.json'
+FIG_ROOT     = 'assets/input_noise/pilot'
 
 ISO_LEVELS = [0.30, 0.50, 0.70, 0.90]
 

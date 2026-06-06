@@ -32,7 +32,7 @@ def main(method='random', output_dir=None, n_repeats=1):
     if method not in UNSTRUCTURED_METHODS:
         raise SystemExit(f"unknown method '{method}'")
     if output_dir is None:
-        output_dir = f'unstructured_pruning/figures/unstructured_figures_cifar_resnet_{method}'
+        output_dir = f'assets/unstructured_pruning/unstructured_figures_cifar_resnet_{method}'
 
     np.random.seed(SEED); torch.manual_seed(SEED)
     print("=" * 70)

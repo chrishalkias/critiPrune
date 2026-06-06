@@ -2,7 +2,7 @@
 r"""Single-plot overlay of all sigmoid fits across (dataset, method, arch).
 
 For every cell in the main-text unstructured_pruning scaling JSONs
-(``unstructured_pruning/figures/unstructured_figures_<dataset>_<method>/
+(``assets/unstructured_pruning/unstructured_figures_<dataset>_<method>/
 scaling_results.json``), average the cached sigmoid parameters across
 repeats and plot
 

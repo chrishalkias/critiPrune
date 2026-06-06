@@ -21,7 +21,7 @@ inspect the result quickly.  Per-cell losses are cached as JSON so
 re-renders skip the expensive forward passes.
 
 Outputs land in
-``unstructured_pruning/figures/loss_scaling/``.
+``assets/unstructured_pruning/loss_scaling/``.
 
 Usage
 -----
@@ -358,7 +358,7 @@ def main(datasets, methods, force=False):
     have_latex = _configure_style()
     print(f'  Rendering with text.usetex = {have_latex}')
 
-    base_out = 'unstructured_pruning/figures/loss_scaling'
+    base_out = 'assets/unstructured_pruning/loss_scaling'
     os.makedirs(base_out, exist_ok=True)
 
     saved = []

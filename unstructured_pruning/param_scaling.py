@@ -5,7 +5,7 @@ Tests whether the critical weight density scales as a single power law in the
 total number of parameters rather than separately in H and L.
 
 Produces a 4x3 log-log figure (dataset x method) saved to
-unstructured_pruning/figures/param_scaling.png.
+assets/unstructured_pruning/param_scaling.png.
 """
 
 import json
@@ -16,7 +16,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-FIGURES_DIR = 'unstructured_pruning/figures'
+FIGURES_DIR = 'assets/unstructured_pruning'
 OUTPUT_PATH = os.path.join(FIGURES_DIR, 'param_scaling.png')
 MIN_R2 = 0.80
 

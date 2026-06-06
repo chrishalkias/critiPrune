@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """C1: multi-iso-level collapse on the pilot cells.
 
-Re-uses the existing joint (s, sigma) grid in input_noise/results.json
+Re-uses the existing joint (s, sigma) grid in assets/input_noise/pilot/results.json
 (no retraining). For each pilot cell, extracts iso-A contours at
 A in {0.3, 0.5, 0.7, 0.9}, fits the per-cell rational curve
 (eq. 12 of docs/input_noise.md), and computes the parameter-free
 collapse residual RMS(eta - (1 - xi)) per iso level (eq. 14).
 
-Writes input_noise/extensions/iso_levels/results.json.
+Writes assets/input_noise/extensions/iso_levels/results.json.
 
 Run::
 
@@ -29,8 +29,8 @@ if _ROOT not in sys.path:
 
 from input_noise.extensions._analysis import analyze_cell    # noqa: E402
 
-PILOT_RESULTS = 'input_noise/results.json'
-OUTPUT_JSON   = 'input_noise/extensions/iso_levels/results.json'
+PILOT_RESULTS = 'assets/input_noise/pilot/results.json'
+OUTPUT_JSON   = 'assets/input_noise/extensions/iso_levels/results.json'
 ISO_LEVELS    = [0.30, 0.50, 0.70, 0.90]
 
 

@@ -434,7 +434,7 @@ def main():
     ap.add_argument('--u-max', type=float, default=30.0,
                     help='upper bound on u; s_max = u^2 / (1 + u^2)')
     ap.add_argument('--output-dir',
-                    default='unstructured_pruning/toy_examples/figures/binary')
+                    default='assets/unstructured_pruning/toy_examples/binary')
     args = ap.parse_args()
 
     have_latex = _configure_style()

@@ -26,7 +26,7 @@ Key differences from mnist_scaling.py
 * Architecture grid: H ∈ {64, 128, 256, 512} × L ∈ {2, 3, 5, 7, 10}
   (20 configurations).
 
-Outputs → mnist28_figures/
+Outputs → assets/legacy/mnist28/
   mnist28_scaling_curves.png
   mnist28_scaling_laws.png
   mnist28_parameter_heatmaps.png
@@ -62,7 +62,7 @@ from pruning import (
 # ---------------------------------------------------------------------------
 
 SEED       = 42
-OUTPUT_DIR = 'mnist28_figures'
+OUTPUT_DIR = 'assets/legacy/mnist28'
 # Dataset cache — overridable via env var so cluster jobs can use persistent $HOME storage
 # instead of per-node /tmp, which is cleared between jobs.
 MNIST_DATA_DIR = os.environ.get('MNIST_DATA_DIR', '/tmp/mnist28')

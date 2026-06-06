@@ -100,7 +100,7 @@ Colorbar runs `[0, 1]` (all `R^2` values in the data are positive; no cell has t
   - **Colour fades upward with depth.** As `L` grows from 2 to 10, median `R^2` drops monotonically, ending in the orange-red `[0.2, 0.4]` band at `L = 9, 10` on `CIFAR-10 ResNet18` and sklearn digits. MNIST decays more slowly and stays light-green into `L = 7-8`.
   - **`H` matters less than `L`.** Within a fixed row (fixed `L`), `R^2` is roughly constant in `H` on MNIST and CIFAR-ResNet, with only a slight green-deepening trend toward large `H`. On sklearn digits the smallest networks (`H <= 16`, `L >= 4`) fail more visibly, but otherwise `H` is a weak axis.
 
-This is the **same depth-residual signature** documented in the F41 toy sweep (`unstructured_pruning/toy_examples/figures/sweep_*/residuals.png`): the linearised single-layer SNR derivation is exact at `L = 2`, deviates visibly by `L = 4`, and is the dominant correction by `L >= 8`. The current experiment confirms this at full scale (~3200 cells) across three datasets and three pruning methods.
+This is the **same depth-residual signature** documented in the F41 toy sweep (`assets/unstructured_pruning/toy_examples/sweep_*/residuals.png`): the linearised single-layer SNR derivation is exact at `L = 2`, deviates visibly by `L = 4`, and is the dominant correction by `L >= 8`. The current experiment confirms this at full scale (~3200 cells) across three datasets and three pruning methods.
 
 ## Per-method invariance
 
@@ -127,7 +127,7 @@ The conversion law `sigma^2(s) = s sigma^2(1) - (1 - s) <x^2>` does not care *wh
 
 ## Outputs
 
-Figures in `input_noise/figures_cluster/`:
+Figures in `assets/input_noise/cluster/`:
 
 - `collapse_all.png`        two-panel: raw scatter (left) + two-stage cross-cell median (right)
 - `collapse_L2.png`         L=2 only — the strongest collapse test (framework is exact at L=2)

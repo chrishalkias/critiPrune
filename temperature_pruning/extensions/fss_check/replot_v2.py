@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 ROOT = Path("/Users/chrischalkias/Projects/critiPrune")
-OUT = ROOT / "temperature_pruning" / "extensions" / "fss_check"
+OUT = ROOT / "assets" / "temperature_pruning" / "fss_check"
 OUT.mkdir(parents=True, exist_ok=True)
 
 R2_MIN, BETA_LO, BETA_HI = 0.80, 0.1, 1e4
@@ -22,7 +22,7 @@ R2_MIN, BETA_LO, BETA_HI = 0.80, 0.1, 1e4
 _DENS_DS = [("sklearn", "sklearn_digits"), ("mnist28", "mnist28"),
             ("cifar_pca", "cifar_pca"), ("cifar_resnet", "cifar_resnet")]
 SOURCES = [
-    (f"unstructured_pruning/figures/unstructured_figures_{slug}_{m}/scaling_results.json",
+    (f"assets/unstructured_pruning/unstructured_figures_{slug}_{m}/scaling_results.json",
      label, m)
     for slug, label in _DENS_DS for m in ("random", "magnitude", "wanda")
 ]
