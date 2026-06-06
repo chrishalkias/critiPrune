@@ -83,7 +83,7 @@ echo "  dataset=$DATASET  method=$METHOD"
 echo "  cpus=${SLURM_CPUS_PER_TASK:-?}  mem=${SLURM_MEM_PER_NODE:-?}"
 echo "  dense grid: |s|=50  |sigma|=16  (3 mask x 3 noise)"
 
-python3 -m input_noise.cluster_sweep \
+python3 -m input_noise.runners.cluster_sweep \
     --dataset "$DATASET" \
     --method  "$METHOD" \
     --results-base input_noise/results_cluster_dense \

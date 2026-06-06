@@ -12,8 +12,8 @@ which reads only those two JSONs -- so after a refit
 
 Usage
 -----
-    .venv/bin/python -m unstructured_pruning.replot_from_json
-    .venv/bin/python -m unstructured_pruning.replot_from_json --base FIGS_DIR
+    .venv/bin/python -m unstructured_pruning.plotting.replot_from_json
+    .venv/bin/python -m unstructured_pruning.plotting.replot_from_json --base FIGS_DIR
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ import os
 import matplotlib
 matplotlib.use('Agg')
 
-from .core import make_plots
+from ..core import make_plots
 
 
 def _safe_label(token: str) -> str:

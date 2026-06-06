@@ -25,9 +25,9 @@ Outputs land in
 
 Usage
 -----
-    python -m unstructured_pruning.loss_scaling
-    python -m unstructured_pruning.loss_scaling --datasets mnist28 cifar_pca
-    python -m unstructured_pruning.loss_scaling --force      # ignore cache
+    python -m unstructured_pruning.analysis.loss_scaling
+    python -m unstructured_pruning.analysis.loss_scaling --datasets mnist28 cifar_pca
+    python -m unstructured_pruning.analysis.loss_scaling --force      # ignore cache
 """
 
 from __future__ import annotations
@@ -77,7 +77,7 @@ DATASETS = {
         'dataset_label': r'MNIST-28',
     },
     'cifar_pca': {
-        'data_module':   'unstructured_pruning.cifar_scaling',
+        'data_module':   'unstructured_pruning.runners.cifar_scaling',
         'data_loader':   'load_cifar_pca',
         'dataset_label': r'CIFAR-10 + PCA(200)',
     },

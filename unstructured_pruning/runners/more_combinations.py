@@ -11,7 +11,7 @@ GPU time.
 
 Usage
 -----
-    python -m unstructured_pruning.more_combinations \\
+    python -m unstructured_pruning.runners.more_combinations \\
         --dataset mnist28 --method random [--n-repeats 1]
 
 Outputs land in ``assets/unstructured_pruning/unstructured_figures_<dataset>_<method>/``
@@ -71,7 +71,7 @@ DATASETS = {
         'dataset_label': 'MNIST 28x28',
     },
     'cifar_pca': {
-        'data_module':  'unstructured_pruning.cifar_scaling',
+        'data_module':  'unstructured_pruning.runners.cifar_scaling',
         'data_loader':  'load_cifar_pca',
         'input_size':   200,  # PCA_DIM in cifar_scaling.py
         'H_base':   [64, 96, 128, 192, 256, 384, 512],

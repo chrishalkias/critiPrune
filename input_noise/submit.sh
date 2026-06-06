@@ -31,4 +31,4 @@ echo "  squeue -u \$USER -j $JOB_ID"
 echo "  tail -f slurm_logs/inoise_${JOB_ID}_*.out"
 echo
 echo "After all tasks finish, aggregate to a single JSON with:"
-echo "  python3 -m input_noise.aggregate"
+echo "  python3 -m input_noise.runners.aggregate"

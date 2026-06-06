@@ -27,10 +27,10 @@ mkdir -p slurm_logs
 : "${N_REPEATS:=1}"
 
 case "$DATASET" in
-    sklearn)      MODULE="unstructured_pruning.mnist_scaling"         ;;
-    mnist28)      MODULE="unstructured_pruning.mnist28_scaling"       ;;
-    cifar_pca)    MODULE="unstructured_pruning.cifar_scaling"         ;;
-    cifar_resnet) MODULE="unstructured_pruning.cifar_resnet_scaling"  ;;
+    sklearn)      MODULE="unstructured_pruning.runners.mnist_scaling"         ;;
+    mnist28)      MODULE="unstructured_pruning.runners.mnist28_scaling"       ;;
+    cifar_pca)    MODULE="unstructured_pruning.runners.cifar_scaling"         ;;
+    cifar_resnet) MODULE="unstructured_pruning.runners.cifar_resnet_scaling"  ;;
     *) echo "unknown DATASET: $DATASET" >&2; exit 2 ;;
 esac
 

@@ -159,7 +159,7 @@ def load_fc_checkpoint(ckpt_path, device='cpu'):
     """Load a saved FCNetwork checkpoint and return (model, ckpt_dict).
 
     Encapsulates the dependency on ``pruning.pruning.FCNetwork`` so that
-    downstream tools (e.g. ``unstructured_pruning.loss_scaling``) only
+    downstream tools (e.g. ``unstructured_pruning.analysis.loss_scaling``) only
     need to import from the ``unstructured_pruning`` package.
     """
     from pruning.pruning import FCNetwork  # local import: heavy + side effects

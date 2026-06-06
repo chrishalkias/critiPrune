@@ -9,8 +9,8 @@ Reads ``assets/temperature_pruning/<dataset>/results.json`` and writes
 ``beta_vs_sigma.png`` next to it.
 
 Usage:
-    python -m temperature_pruning.plot_beta_vs_sigma                # mnist28
-    python -m temperature_pruning.plot_beta_vs_sigma --dataset sklearn
+    python -m temperature_pruning.plotting.plot_beta_vs_sigma                # mnist28
+    python -m temperature_pruning.plotting.plot_beta_vs_sigma --dataset sklearn
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 
-from .analysis import fit_critical_line, group_pc_by_cell
+from ..analysis import fit_critical_line, group_pc_by_cell
 
 
 def _gaussian_plus_const(sigma, a, Sigma, b):

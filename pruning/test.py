@@ -824,7 +824,7 @@ class TestFitParamScalingRobustness:
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         if repo_root not in sys.path:
             sys.path.insert(0, repo_root)
-        from unstructured_pruning.param_scaling import fit_param_scaling
+        from unstructured_pruning.analysis.param_scaling import fit_param_scaling
         return fit_param_scaling
 
     def test_clean_data(self):

@@ -10,6 +10,21 @@ It is the **unstructured / weight-level** counterpart to [`pruning/`](../pruning
 which prunes whole-neuron paths via top-`K` selection. The two subpackages
 share the `FCNetwork` model class and the sigmoid-fitting utilities.
 
+## Layout
+
+```
+unstructured_pruning/
+├── core.py  methods.py        shared engine + pruning methods (kept at root)
+├── runners/    per-dataset scaling drivers + method_comparison + more_combinations (CLI: python -m unstructured_pruning.runners.<name>)
+├── analysis/   param_scaling, loss_scaling, heldout_s0_prediction(+multi)
+├── plotting/   plot_3d_scaling(+_v2), plot_beta_vs_s0, replot_from_json
+├── toy_examples/   analytically tractable minimal experiments
+├── extensions/     single_axis_stratified probe
+└── checkpoints/    trained weights (data, stays)
+```
+
+All generated figures/JSON now write under `assets/unstructured_pruning/`.
+
 ---
 
 ## Scientific motivation
@@ -214,13 +229,13 @@ From the repository root:
 
 ```bash
 # Single (dataset, method) cell — resumes if scaling_results.json exists
-python -m unstructured_pruning.mnist_scaling        --method wanda --n-repeats 3
-python -m unstructured_pruning.mnist28_scaling      --method magnitude
-python -m unstructured_pruning.cifar_scaling        --method wanda
-python -m unstructured_pruning.cifar_resnet_scaling --method random
+python -m unstructured_pruning.runners.mnist_scaling        --method wanda --n-repeats 3
+python -m unstructured_pruning.runners.mnist28_scaling      --method magnitude
+python -m unstructured_pruning.runners.cifar_scaling        --method wanda
+python -m unstructured_pruning.runners.cifar_resnet_scaling --method random
 
 # After all 12 (dataset, method) cells have run, regenerate the cross-dataset figure
-python -m unstructured_pruning.param_scaling
+python -m unstructured_pruning.analysis.param_scaling
 ```
 
 CLI flags (common to all four dataset drivers):

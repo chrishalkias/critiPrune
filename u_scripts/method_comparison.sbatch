@@ -43,7 +43,7 @@ LVAL="${LVAL:-5}"
 
 echo "Job $SLURM_JOB_ID: method comparison  dataset=$DATASET H=$HVAL L=$LVAL"
 
-python3 -m unstructured_pruning.method_comparison \
+python3 -m unstructured_pruning.runners.method_comparison \
     --dataset "$DATASET" --H "$HVAL" --L "$LVAL" \
     --torch-threads "${SLURM_CPUS_PER_TASK:-8}"
 

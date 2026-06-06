@@ -26,7 +26,7 @@ _REPO = os.path.dirname(_HERE)
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
-import unstructured_pruning.plot_3d_scaling as base
+import unstructured_pruning.plotting.plot_3d_scaling as base
 
 
 def _aggregate_v2(rows, min_r2=0.80):

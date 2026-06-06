@@ -27,7 +27,7 @@ import os
 from unstructured_pruning.core import DEFAULT_DENSITIES
 
 from .core import DEFAULT_SIGMAS, run_temperature_pruning_experiment
-from .plots import make_all_plots
+from .plotting.plots import make_all_plots
 
 
 _CKPT_BASE = 'unstructured_pruning/checkpoints'

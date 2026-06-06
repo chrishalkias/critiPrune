@@ -32,7 +32,7 @@ Outputs (``assets/input_noise/cluster/``):
 
 Run::
 
-    .venv/bin/python -m input_noise.cluster_analyze
+    .venv/bin/python -m input_noise.analysis.cluster_analyze
 """
 
 from __future__ import annotations

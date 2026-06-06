@@ -43,7 +43,7 @@ echo "  Dataset   : $DATASET"
 echo "  Method    : $METHOD"
 echo "  N_REPEATS : $N_REPEATS"
 echo "  EXTRA_ONLY: $EXTRA_REPEATS_ONLY"
-echo "  Module    : unstructured_pruning.more_combinations"
+echo "  Module    : unstructured_pruning.runners.more_combinations"
 echo "  Output    : $OUTPUT_DIR"
 echo "  Node      : $SLURM_NODELIST"
 echo "  Started   : $(date)"
@@ -70,7 +70,7 @@ esac
 
 python3 -c "import torch; print('CUDA:', torch.cuda.is_available(), '|', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'N/A')"
 
-python3 -m unstructured_pruning.more_combinations \
+python3 -m unstructured_pruning.runners.more_combinations \
     --dataset "$DATASET" \
     --method "$METHOD" \
     --output-dir "$OUTPUT_DIR" \

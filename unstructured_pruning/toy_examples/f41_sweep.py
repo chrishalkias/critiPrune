@@ -82,12 +82,12 @@ def _six_tuple_to_four(loader_fn):
 
 
 def _cifar_pca_loader(data_dir):
-    """Wrap ``unstructured_pruning.cifar_scaling.load_cifar_pca`` to the
+    """Wrap ``unstructured_pruning.runners.cifar_scaling.load_cifar_pca`` to the
     four-tuple torch contract. ``data_dir`` is accepted for signature
     uniformity and currently ignored (the underlying loader caches under
     ``/tmp/cifar10``)."""
     del data_dir
-    from unstructured_pruning.cifar_scaling import load_cifar_pca
+    from unstructured_pruning.runners.cifar_scaling import load_cifar_pca
     return _six_tuple_to_four(load_cifar_pca)
 
 

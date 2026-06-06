@@ -15,12 +15,12 @@ applied post-hoc to those same nets.
 
 Run (local, fast for sklearn; mnist28 is the paper target)::
 
-    .venv/bin/python -m unstructured_pruning.method_comparison \\
+    .venv/bin/python -m unstructured_pruning.runners.method_comparison \\
         --dataset mnist28 --H 192 --L 5
 
 then plot::
 
-    .venv/bin/python -m unstructured_pruning.method_comparison \\
+    .venv/bin/python -m unstructured_pruning.runners.method_comparison \\
         --dataset mnist28 --H 192 --L 5 --plot-only
 """
 
@@ -64,7 +64,7 @@ def _load_dataset(dataset):
         from pruning.cifar_scaling import load_cifar10
         return load_cifar10()
     if dataset == 'cifar_pca':
-        from unstructured_pruning.cifar_scaling import load_cifar_pca
+        from unstructured_pruning.runners.cifar_scaling import load_cifar_pca
         return load_cifar_pca()
     raise ValueError(f'unknown dataset: {dataset}')
 

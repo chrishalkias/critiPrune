@@ -20,8 +20,8 @@ Computer-Modern serif body font for publication-grade typography.
 
 Usage
 -----
-    python -m unstructured_pruning.plot_3d_scaling
-    python -m unstructured_pruning.plot_3d_scaling --base FIGS_DIR
+    python -m unstructured_pruning.plotting.plot_3d_scaling
+    python -m unstructured_pruning.plotting.plot_3d_scaling --base FIGS_DIR
 """
 
 from __future__ import annotations

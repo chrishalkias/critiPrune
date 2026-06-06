@@ -38,8 +38,8 @@ bound, the true steepness is unresolved) and drawn as open markers.
 
 Usage
 -----
-    python -m unstructured_pruning.plot_beta_vs_s0
-    python -m unstructured_pruning.plot_beta_vs_s0 --base FIGS_DIR
+    python -m unstructured_pruning.plotting.plot_beta_vs_s0
+    python -m unstructured_pruning.plotting.plot_beta_vs_s0 --base FIGS_DIR
 """
 
 from __future__ import annotations

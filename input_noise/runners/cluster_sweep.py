@@ -18,7 +18,7 @@ records ``H, L, repeat, dataset, method`` plus the sweep arrays.
 
 Run::
 
-    .venv/bin/python -m input_noise.cluster_sweep --dataset mnist28 --method random
+    .venv/bin/python -m input_noise.runners.cluster_sweep --dataset mnist28 --method random
 
 CLI flags allow tuning the grid; the defaults match
 ``input_noise/findings.md``'s pilot for direct comparability.
@@ -61,7 +61,7 @@ def _load_mnist28():
     return load_mnist28()
 
 def _load_cifar_pca():
-    from unstructured_pruning.cifar_scaling import load_cifar_pca
+    from unstructured_pruning.runners.cifar_scaling import load_cifar_pca
     return load_cifar_pca()
 
 def _load_cifar_resnet():

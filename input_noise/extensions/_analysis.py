@@ -8,7 +8,7 @@ two operations:
     and the parameter-free collapse residual (eq. 14)
 
 These wrap input_noise.core.iso_accuracy_contour and use the same fit
-formula as input_noise.plots.fit_conversion, so numbers reproduce.
+formula as input_noise.plotting.plots.fit_conversion, so numbers reproduce.
 """
 
 from __future__ import annotations

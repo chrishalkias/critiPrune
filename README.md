@@ -178,8 +178,8 @@ assets/                      Cross-cutting reference figures used in the paper
 
 **Unstructured pruning sweep (main results):**
 ```bash
-python -m unstructured_pruning.mnist28_scaling --method wanda
-python -m unstructured_pruning.cifar_resnet_scaling --method wanda
+python -m unstructured_pruning.runners.mnist28_scaling --method wanda
+python -m unstructured_pruning.runners.cifar_resnet_scaling --method wanda
 # outputs to assets/unstructured_pruning/unstructured_figures_<dataset>_<method>/
 ```
 

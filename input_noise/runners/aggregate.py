@@ -4,7 +4,7 @@ aggregated JSON for analysis. Light-weight: just concatenates records.
 
 Usage::
 
-    .venv/bin/python -m input_noise.aggregate \\
+    .venv/bin/python -m input_noise.runners.aggregate \\
         --root input_noise/results_cluster \\
         --output input_noise/results_cluster_all.json
 """

@@ -30,7 +30,7 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from input_noise.cluster_analyze import iso_contour, fit_framework  # noqa: E402
+from input_noise.analysis.cluster_analyze import iso_contour, fit_framework  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

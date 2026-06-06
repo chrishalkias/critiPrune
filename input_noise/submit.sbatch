@@ -73,7 +73,7 @@ echo "Job $SLURM_JOB_ID task $IDX started at $(date)"
 echo "  dataset=$DATASET  method=$METHOD"
 echo "  cpus=${SLURM_CPUS_PER_TASK:-?}  mem=${SLURM_MEM_PER_NODE:-?}"
 
-python3 -m input_noise.cluster_sweep \
+python3 -m input_noise.runners.cluster_sweep \
     --dataset "$DATASET" \
     --method  "$METHOD" \
     --torch-threads "${SLURM_CPUS_PER_TASK:-4}"
