@@ -24,3 +24,11 @@ __pycache__/
 *.bak
 *.bak.*
 texput.log
+
+# generated outputs + raw data (regenerable; kept local, not in git)
+assets/
+**/checkpoints/
+input_noise/results_cluster/
+input_noise/results_cluster_dense/
+input_noise/results_cluster_all.json
+input_noise/results_cluster_dense_all.json
