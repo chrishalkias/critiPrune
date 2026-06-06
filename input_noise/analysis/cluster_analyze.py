@@ -414,7 +414,9 @@ def plot_collapse_all(xi, eta, groups, cell_ids, out_path, have_latex):
     return rms
 
 
-def plot_eta_conditional_kde(xi, eta, out_path, have_latex, n_xi_bins=5):
+def plot_eta_conditional_kde(xi, eta, out_path, have_latex, n_xi_bins=5,
+                             drop_first_band=False, show_prediction=True,
+                             datasets=None):
     """Conditional KDE of the xi-band composition as a function of eta.
 
     Mirrors the seaborn gallery example ``multiple_conditional_kde``:
@@ -450,41 +452,190 @@ def plot_eta_conditional_kde(xi, eta, out_path, have_latex, n_xi_bins=5):
     xi_band = pd.cut(xi, bins=edges, labels=labels, include_lowest=True,
                      ordered=True)
     df = pd.DataFrame({'eta': eta, 'xi_band': xi_band})
+    if datasets is not None:
+        df['dataset'] = np.asarray(datasets)
+
+    # Optionally drop the lowest xi band: it spans the whole eta range and
+    # swamps the fill, obscuring the higher bands. Filtering it out (and the
+    # unused category) renormalises the conditional proportions over the rest.
+    if drop_first_band:
+        df = df[df['xi_band'] != labels[0]].copy()
+        df['xi_band'] = df['xi_band'].cat.remove_unused_categories()
+        centres = centres[1:]
+        labels = labels[1:]
 
     palette = 'ch:rot=-.25,hue=1,light=.75'
-    g = sns.displot(
-        data=df,
-        x='eta', hue='xi_band',
-        kind='kde', height=6,
-        multiple='fill', clip=(None, None),
-        palette=palette,
-    )
-    ax = g.ax
+    common = dict(x='eta', hue='xi_band', kind='kde',
+                  multiple='fill', clip=(None, None), palette=palette)
+    title = (r'Conditional $\xi$-band composition of the iso-$A$ collapse '
+             r'vs.\ $\eta$'
+             if have_latex
+             else 'Conditional xi-band composition of the iso-A collapse vs eta')
 
-    # Colours displot assigned to the ordered bands, reused for the overlay.
-    band_colors = sns.color_palette(palette, n_xi_bins)
+    if datasets is not None:
+        # One panel per dataset (shared xi-band hue + legend), in the spirit
+        # of the raw_contour facet. Bands are defined on the pooled xi range
+        # above, so colours are comparable across panels.
+        col_order = sorted(df['dataset'].unique())
+        g = sns.displot(data=df, col='dataset', col_order=col_order,
+                        facet_kws=dict(sharey=True), height=4.5, aspect=1.0,
+                        **common)
+        for ds, ax_ in g.axes_dict.items():
+            ax_.set_title(DATASET_LABEL.get(ds, ds))
+        axes = list(g.axes.flat)
+        g.figure.suptitle(title, y=1.04)
+    else:
+        g = sns.displot(data=df, height=6, **common)
+        axes = [g.ax]
+        g.ax.set_title(title)
 
-    # Overlay theory: eta = 1 - xi_centre for each band.
-    for c, col, lab in zip(centres, band_colors, labels):
-        eta_theory = 1.0 - c
-        ax.axvline(eta_theory, color=col, ls='--', lw=1.4, alpha=0.9, zorder=5)
-        ax.plot([eta_theory], [1.02], marker='v', ms=9, color=col,
-                markeredgecolor='0.2', markeredgewidth=0.5,
-                clip_on=False, zorder=6)
-    # Single proxy handle documenting the markers.
-    ax.plot([], [], marker='v', ls='--', color='0.3',
-            label=(r'$\eta = 1-\xi$ (band centre)'
-                   if have_latex else 'eta = 1 - xi (band centre)'))
+    # Overlay theory: eta = 1 - xi_centre for each band, on every panel.
+    if show_prediction:
+        band_colors = sns.color_palette(palette, len(labels))
+        for ax_ in axes:
+            for c, col in zip(centres, band_colors):
+                eta_theory = 1.0 - c
+                ax_.axvline(eta_theory, color=col, ls='--', lw=1.4, alpha=0.9,
+                            zorder=5)
+                ax_.plot([eta_theory], [1.02], marker='v', ms=8, color=col,
+                         markeredgecolor='0.2', markeredgewidth=0.5,
+                         clip_on=False, zorder=6)
 
-    ax.set_xlabel(r'$\eta = \sigma_{\mathrm{iso}}^{2}(s) / \sigma^2(1)$'
-                  if have_latex else 'eta = sigma^2_iso(s) / sigma^2(1)')
-    ax.set_ylabel(r'conditional proportion  $P(\xi\,\mathrm{band}\mid \eta)$'
-                  if have_latex else 'conditional proportion P(xi band | eta)')
+    g.set_axis_labels(
+        (r'$\eta = \sigma_{\mathrm{iso}}^{2}(s) / \sigma^2(1)$'
+         if have_latex else 'eta = sigma^2_iso(s) / sigma^2(1)'),
+        (r'conditional proportion  $P(\xi\,\mathrm{band}\mid \eta)$'
+         if have_latex else 'conditional proportion P(xi band | eta)'))
     if g.legend is not None:
         g.legend.set_title(r'$\xi$ band' if have_latex else 'xi band')
 
     g.savefig(out_path, dpi=180, facecolor='white', bbox_inches='tight')
     plt.close(g.figure)
+    matplotlib.rcParams.update(matplotlib.rcParamsDefault)
+
+
+def plot_eta_kde_depth_grid(xi, eta, groups, cell_ids, out_path, have_latex,
+                            n_xi_bins=15, drop_first_band=True):
+    """Conditional-KDE grid: rows = depth strata, columns = dataset + ideal.
+
+    Splits the pooled ``eta_conditional_kde`` view by network depth to expose
+    its bimodality: shallow cells sit on the framework line eta = 1 - xi, deep
+    cells fall below it. Each depth row uses its own colour family running
+    dark -> light as xi increases (blue / green / orange), with a per-row
+    colourbar. The final column of each row is the idealized eta = 1 - xi
+    reference (recoloured in the row's family) for direct comparison.
+    Depth strata: L<=3 (shallow), 4<=L<=6 (medium), L>=7 (deep).
+    """
+    import pandas as pd
+    import seaborn as sns
+    from matplotlib.colors import ListedColormap, BoundaryNorm
+    from matplotlib.cm import ScalarMappable
+
+    sns.set_theme(style='whitegrid', font_scale=1.6)
+    xi = np.asarray(xi); eta = np.asarray(eta)
+    L = np.array([cid[3] for cid in cell_ids])
+    dsv = np.array([g[0] for g in groups])
+
+    # xi bands on the pooled range -> identical band definitions every panel.
+    edges = np.linspace(float(xi.min()), float(xi.max()), n_xi_bins + 1)
+    labels = [f'{edges[i]:.2f}-{edges[i + 1]:.2f}' for i in range(n_xi_bins)]
+    band = pd.cut(xi, bins=edges, labels=labels, include_lowest=True,
+                  ordered=True)
+    df = pd.DataFrame({'eta': eta, 'xi': xi, 'xi_band': band, 'L': L,
+                       'dataset': dsv})
+    if drop_first_band:
+        df = df[df['xi_band'] != labels[0]].copy()
+        df['xi_band'] = df['xi_band'].cat.remove_unused_categories()
+        labels = labels[1:]
+        edges = edges[1:]
+    nb = len(labels)
+
+    def depth_of(l):
+        return 'shallow' if l <= 3 else ('medium' if l <= 6 else 'deep')
+    df['depth'] = df['L'].map(depth_of)
+
+    # Native cubehelix/ColorBrewer ramps run light -> dark: lowest xi band is
+    # lightest, bands darken as xi grows.
+    rows = [
+        ('shallow', r'$L \le 3$ (shallow)' if have_latex else 'L<=3 (shallow)',
+         'ch:rot=-.25,hue=1,light=.75'),
+        ('medium', r'$4 \le L \le 6$ (medium)' if have_latex
+         else '4<=L<=6 (medium)', 'YlGn'),
+        ('deep', r'$L \ge 7$ (deep)' if have_latex else 'L>=7 (deep)',
+         'YlOrBr'),
+    ]
+    datasets = sorted(df['dataset'].unique())
+    ideal_title = r'idealized: $\eta = 1-\xi$' if have_latex \
+        else 'idealized: eta = 1 - xi'
+    col_titles = [DATASET_LABEL.get(d, d) for d in datasets] + [ideal_title]
+    n_cols = len(datasets) + 1
+
+    fig, axes = plt.subplots(3, n_cols, figsize=(5.0 * n_cols, 13.0),
+                             sharex=True, sharey=True, facecolor='white',
+                             constrained_layout=True)
+    for i, (dkey, dlabel, spec) in enumerate(rows):
+        band_colors = sns.color_palette(spec, nb)                  # light->dark
+        # Push the dark (high-xi) end darker for more contrast: scale each
+        # band toward black, untouched at the light end -> 0.5 at the darkest.
+        fac = np.linspace(1.0, 0.5, nb)
+        band_colors = [tuple(np.clip(np.asarray(c) * f, 0.0, 1.0))
+                       for c, f in zip(band_colors, fac)]
+        pal = dict(zip(labels, band_colors))
+        for j in range(n_cols):
+            ax = axes[i, j]
+            if j < len(datasets):
+                sub = df[(df['depth'] == dkey) & (df['dataset'] == datasets[j])]
+                bw = None
+            else:                          # idealized eta = 1 - xi, per depth
+                dsub = df[df['depth'] == dkey]
+                sub = dsub[['xi_band']].copy()
+                sub['eta'] = 1.0 - dsub['xi'].to_numpy()
+                bw = 0.4
+            present = [lab for lab in labels if (sub['xi_band'] == lab).any()]
+            if len(sub) >= 20 and len(present) >= 2:
+                kw = dict(data=sub, x='eta', hue='xi_band', hue_order=present,
+                          multiple='fill', clip=(None, None), palette=pal,
+                          ax=ax, legend=False, warn_singular=False,
+                          linewidth=0.3)
+                if bw is not None:
+                    kw['bw_adjust'] = bw
+                sns.kdeplot(**kw)
+            else:
+                ax.text(0.5, 0.5, 'no cells', transform=ax.transAxes,
+                        ha='center', va='center', color='0.5')
+            ax.set_xlim(-0.1, 1.3); ax.set_ylim(0, 1)
+            ax.grid(True, alpha=0.25, lw=0.4)
+            ax.set_xlabel(''); ax.set_ylabel('')
+            # x tick labels on every panel, not just the bottom row.
+            ax.tick_params(axis='x', labelbottom=True)
+            if i == 0:
+                ax.set_title(col_titles[j], fontsize=17)
+        axes[i, 0].text(-0.14, 0.5, dlabel, transform=axes[i, 0].transAxes,
+                        rotation=90, va='center', ha='center', fontsize=18,
+                        fontweight='bold', color=band_colors[-1])
+        cmap = ListedColormap(band_colors)
+        sm = ScalarMappable(cmap=cmap, norm=BoundaryNorm(edges, nb))
+        sm.set_array([])
+        cb = fig.colorbar(sm, ax=list(axes[i, :]), location='right',
+                          fraction=0.03, pad=0.01)
+        if i == 0:                     # label once, above the top colourbar
+            cb.ax.set_title(r'$\xi$ band' if have_latex else 'xi band',
+                            fontsize=15, pad=8)
+        cb.ax.tick_params(labelsize=12)
+
+    fig.supxlabel(r'$\eta = \sigma_{\mathrm{iso}}^{2}(s) / \sigma^2(1)$'
+                  if have_latex else 'eta = sigma^2_iso(s) / sigma^2(1)',
+                  fontsize=22)
+    fig.supylabel(r'conditional proportion  $P(\xi\,\mathrm{band}\mid \eta)$'
+                  if have_latex else 'conditional proportion P(xi band | eta)',
+                  fontsize=22)
+    fig.suptitle(r'Conditional $\xi$-band composition of the iso-$A$ collapse: '
+                 r'depth (rows) $\times$ dataset (columns)'
+                 if have_latex else
+                 'Conditional xi-band composition: depth (rows) x dataset (cols)',
+                 fontsize=24)
+    fig.savefig(out_path, dpi=180, facecolor='white')
+    plt.close(fig)
     matplotlib.rcParams.update(matplotlib.rcParamsDefault)
 
 
@@ -548,8 +699,91 @@ def plot_collapse_by_method(xi, eta, groups, cell_ids, out_path, have_latex):
     return rmses
 
 
+def _iso_conversion_sigma(s, sigma2_1, x2):
+    """Iso-accuracy conversion law on the std axis (paper Eq. iso_conversion):
+
+        sigma_x(s) = sqrt(s * sigma2_1 - (1 - s) * x2).
+
+    Returns NaN where the radicand is negative (below the x-intercept
+    s0 = x2 / (sigma2_1 + x2)), so a plotted line naturally starts at s0.
+    """
+    s = np.asarray(s, dtype=float)
+    radicand = s * sigma2_1 - (1.0 - s) * x2
+    return np.where(radicand >= 0.0, np.sqrt(np.clip(radicand, 0.0, None)),
+                    np.nan)
+
+
+def _envelope_params(records, dataset, anchor_L=2, env_q=0.99):
+    """Per-dataset parameters for the raw-contour overlay curves.
+
+    Returns ``None`` if the dataset has no cell with a finite, positive
+    ``sigma2_1``. Otherwise a dict with:
+
+      x2             input second moment (constant within a dataset)
+      sigma2_1_fw    framework sigma^2(1): mean over ``anchor_L`` cells
+                     (falls back to the smallest available L if ``anchor_L``
+                     has none -- the shallowest depth is the upper envelope)
+      anchor_L_used  the L actually averaged
+      sigma2_1_env   empirical upper-envelope sigma^2(1): ``env_q`` quantile
+                     of all per-cell sigma2_1 (robust-max)
+      n_fw, n_all    cell counts
+      s0_fw, s0_env  x-intercepts x2 / (sigma2_1 + x2) for each curve
+    """
+    recs = [r for r in records
+            if r['dataset'] == dataset
+            and r.get('sigma2_1') is not None
+            and np.isfinite(r['sigma2_1'])
+            and r['sigma2_1'] > 0.0]
+    if not recs:
+        return None
+    x2 = float(np.median([r['x2_mean'] for r in recs]))
+    all_s21 = np.array([r['sigma2_1'] for r in recs], dtype=float)
+
+    Ls_present = sorted({r['L'] for r in recs})
+    L_used = anchor_L if anchor_L in Ls_present else Ls_present[0]
+    fw_s21 = np.array([r['sigma2_1'] for r in recs if r['L'] == L_used],
+                      dtype=float)
+
+    sigma2_1_fw  = float(fw_s21.mean())
+    sigma2_1_env = float(np.quantile(all_s21, env_q))
+    return {
+        'x2':            x2,
+        'sigma2_1_fw':   sigma2_1_fw,
+        'anchor_L_used': L_used,
+        'sigma2_1_env':  sigma2_1_env,
+        'n_fw':          int(len(fw_s21)),
+        'n_all':         int(len(all_s21)),
+        's0_fw':         x2 / (sigma2_1_fw + x2),
+        's0_env':        x2 / (sigma2_1_env + x2),
+    }
+
+
+def _upper_envelope(s, sigma, nbins=33, min_count=3):
+    """Nonparametric upper envelope of a (s, sigma) cloud.
+
+    Bins ``s`` into ``nbins`` over [0, 1] and returns the per-bin maximum
+    of ``sigma`` for bins holding at least ``min_count`` points. This is a
+    true top boundary -- no point lies above the bin max of its own bin --
+    that hugs the uppermost points, unlike a parametric curve forced through
+    the data. Sparse bins are dropped so a lone outlier cannot define the
+    envelope. Returns ``(centres, tops)`` sorted by ``s``.
+    """
+    s = np.asarray(s, dtype=float)
+    sigma = np.asarray(sigma, dtype=float)
+    edges = np.linspace(0.0, 1.0, nbins + 1)
+    centres = 0.5 * (edges[:-1] + edges[1:])
+    bin_idx = np.clip(np.digitize(s, edges) - 1, 0, nbins - 1)
+    cs, tops = [], []
+    for b in range(nbins):
+        v = sigma[bin_idx == b]
+        if len(v) >= min_count:
+            cs.append(centres[b])
+            tops.append(float(v.max()))
+    return np.asarray(cs), np.asarray(tops)
+
+
 def plot_raw_contour(s_raw, sigma_raw, groups, cell_ids,
-                     out_path, have_latex):
+                     records, out_path, have_latex):
     """Bare iso-A=0.5 contour: every point is a (s, sigma) pair on the
     iso-accuracy locus, no per-cell rescaling.
 
@@ -587,17 +821,45 @@ def plot_raw_contour(s_raw, sigma_raw, groups, cell_ids,
         ax.set_xlim(-0.02, 1.02)
         ax.set_ylim(bottom=0)
         ax.grid(True, alpha=0.3, lw=0.4)
+
+        # Two overlays:
+        #  - dashed black: the EMPIRICAL upper envelope (per-s-bin max of the
+        #    raw points) -- a true top boundary, no point sits above it.
+        #  - solid crimson: the parameter-free framework prediction, the
+        #    conversion law sigma_x(s) = sqrt(s*sigma^2(1) - (1-s)*<x^2>)
+        #    (paper Eq. iso_conversion) with sigma^2(1) measured at the shallow
+        #    anchor depth L where the truncation is exact.
+        ce, te = _upper_envelope(s_raw[idx], sigma_raw[idx])
+        if len(ce):
+            ax.plot(ce, te, ls='--', color='black', lw=1.5, zorder=7,
+                    label=('empirical upper envelope'
+                           if have_latex else 'empirical upper envelope'))
+        p = _envelope_params(records, ds, anchor_L=2)
+        if p is not None:
+            s_curve = np.linspace(0.0, 1.0, 400)
+            fw  = _iso_conversion_sigma(s_curve, p['sigma2_1_fw'],  p['x2'])
+            ax.plot(s_curve, fw, ls='-', color='crimson', lw=1.8, zorder=8,
+                    label=(rf"framework ($L={p['anchor_L_used']}$): $\sigma^2(1)={p['sigma2_1_fw']:.2f}$"
+                           if have_latex else
+                           f"framework (L={p['anchor_L_used']}): sigma^2(1)={p['sigma2_1_fw']:.2f}"))
+            ax.text(0.97, 0.97,
+                    (rf"$\langle x^2\rangle = {p['x2']:.2f}$"
+                     if have_latex else f"<x^2> = {p['x2']:.2f}"),
+                    transform=ax.transAxes, ha='right', va='top', fontsize=8,
+                    bbox=dict(boxstyle='round,pad=0.25', fc='white',
+                              ec='0.7', lw=0.5))
+            ax.legend(loc='upper left', fontsize=7, framealpha=0.9)
     axes[0].set_ylabel(r'input-noise std $\sigma_x$ at $A = 0.5$'
                        if have_latex
                        else 'input-noise std sigma_x at A=0.5')
     cbar = fig.colorbar(sc, ax=axes, shrink=0.85, pad=0.02)
     cbar.set_label('hidden layers $L$' if have_latex else 'hidden layers L')
     cbar.set_ticks(Ls_present)
-    fig.suptitle('Bare iso-accuracy contour: '
-                 r'$(s, \sigma_x)$ at $A = 0.5$, all cells overlaid'
+    fig.suptitle('Iso-accuracy contour $(s, \\sigma_x)$ at $A = 0.5$: '
+                 'empirical envelope vs.\\ framework prediction'
                  if have_latex
-                 else 'Bare iso-accuracy contour: (s, sigma_x) at A=0.5, '
-                      'all cells overlaid',
+                 else 'Iso-accuracy contour (s, sigma_x) at A=0.5: '
+                      'empirical envelope vs framework prediction',
                  y=1.02)
     fig.savefig(out_path, facecolor='white')
     plt.close(fig)
@@ -1276,7 +1538,7 @@ def main():
           f'{len(xi)} contour points pooled')
 
     # Bare iso-A contour scatter: (s, sigma) before any rescaling.
-    plot_raw_contour(s_raw, sigma_raw, groups, cell_ids,
+    plot_raw_contour(s_raw, sigma_raw, groups, cell_ids, records,
                      os.path.join(args.outdir, 'raw_contour.png'),
                      have_latex)
 

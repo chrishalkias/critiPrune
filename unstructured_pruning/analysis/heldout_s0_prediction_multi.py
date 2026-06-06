@@ -1,3 +1,9 @@
+"""Multi-dataset companion to :mod:`heldout_s0_prediction` (sklearn-digits +
+CIFAR-10 ResNet features): held-out prediction of the pruning critical density
+s0 from trained weights alone, via the framework's multi-layer multi-class
+ReLU moment-propagation (no pruning sweep used for the prediction). Dumps
+per-cell (predicted, empirical) s0 rows to ``/tmp/heldout_<dataset>.json`` for
+the pooled predicted-vs-empirical figure."""
 import os, sys, json, re
 import numpy as np, torch
 from scipy.stats import norm, pearsonr, spearmanr
