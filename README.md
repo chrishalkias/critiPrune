@@ -56,19 +56,19 @@ The sigmoid fit succeeds with adjusted $R^2 > 0.9$ in the overwhelming majority 
 The width exponent $\alpha \in [-0.43, -0.31]$ is consistently negative — wider networks are more compressible — and the depth exponent $\gamma \in [0.49, 0.77]$ is consistently positive. These signs match the layered mean-field prediction $p_c \sim L/H$ from the toy model.
 
 <p align="center">
-  <img src="unstructured_pruning/figures/unstructured_figures_mnist28_wanda/scaling_curves.png" width="90%" alt="MNIST-28 unstructured WANDA scaling curves"/>
+  <img src="assets/unstructured_pruning/unstructured_figures_mnist28_wanda/scaling_curves.png" width="90%" alt="MNIST-28 unstructured WANDA scaling curves"/>
   <br/>
   <em>Recovery curves $A(s)$ for MNIST-28 with WANDA pruning across the $(H, L)$ grid.</em>
 </p>
 
 <p align="center">
-  <img src="unstructured_pruning/figures/unstructured_figures_cifar_resnet_wanda/scaling_curves.png" width="90%" alt="CIFAR-ResNet18 unstructured WANDA scaling curves"/>
+  <img src="assets/unstructured_pruning/unstructured_figures_cifar_resnet_wanda/scaling_curves.png" width="90%" alt="CIFAR-ResNet18 unstructured WANDA scaling curves"/>
   <br/>
   <em>Same on CIFAR-10 with frozen ResNet18 features.</em>
 </p>
 
 <p align="center">
-  <img src="unstructured_pruning/figures/unstructured_figures_mnist28_wanda/s0_3d.png" width="80%" alt="MNIST-28 s0 manifold"/>
+  <img src="assets/unstructured_pruning/unstructured_figures_mnist28_wanda/s0_3d.png" width="80%" alt="MNIST-28 s0 manifold"/>
   <br/>
   <em>$s_0(H, L)$ as a fitted manifold over the $H \times L$ grid (MNIST-28, WANDA).</em>
 </p>
@@ -88,13 +88,13 @@ This is the **Sherrington–Kirkpatrick bond-disorder** prediction $p_c(\sigma) 
 **F-regime restriction.** The SK derivation is valid only in the ferromagnetic regime $J_0 > J_1$; beyond the F→SG line the order parameter switches from magnetisation $m$ to the Edwards–Anderson $q$ and the parabolic ansatz breaks down. We restrict the fit to the F regime by a data-driven rule: bootstrap the parabola on $\sigma \le 0.3$, walk outward, and stop when the running $R^2$ drops more than $0.01$ below the bootstrap value. **9 of 27 cells** trigger the cutoff inside $\sigma \in [0, 1]$ — all of them at the largest depths $L \in \{5, 7\}$, consistent with deeper networks accumulating disorder faster and crossing the SK F→SG line at smaller $\sigma$. In every triggering cell the empirical breakdown $\sigma_\text{cutoff}$ tracks $J_0^\text{eff} = 1/\sqrt{2c}$ to within $\pm 0.1$, a non-trivial second confirmation of the SK picture.
 
 <p align="center">
-  <img src="temperature_pruning/figures/mnist28/critical_line.png" width="92%" alt="MNIST-28 critical line under bond disorder"/>
+  <img src="assets/temperature_pruning/mnist28/critical_line.png" width="92%" alt="MNIST-28 critical line under bond disorder"/>
   <br/>
   <em>Empirical critical line $p_c(\sigma)$ on MNIST-28×28 across nine $(H, L)$ cells. Blue: F-regime data used in the fit. Grey crosses + shaded region: SG/thermalisation regime excluded from the fit. Red: quadratic fit. Only $H=128, L=7$ (top-right) shows a clear F→SG breakdown within $\sigma \in [0, 1]$, at $\sigma_\text{cutoff} = 0.85$.</em>
 </p>
 
 <p align="center">
-  <img src="temperature_pruning/figures/cifar_resnet/critical_line.png" width="92%" alt="CIFAR-ResNet critical line under bond disorder"/>
+  <img src="assets/temperature_pruning/cifar_resnet/critical_line.png" width="92%" alt="CIFAR-ResNet critical line under bond disorder"/>
   <br/>
   <em>Same on CIFAR-10 with frozen ResNet18 features. Four of nine cells show an SG/thermalisation regime within the swept range — every $L=7$ cell plus $H=160, L=5$.</em>
 </p>
@@ -117,7 +117,7 @@ Across the full 27-cell grid the medians are $\langle J_0^\text{eff}\rangle \app
 3. The **finite-$D$ + finite-$L$** corrections from sample-complexity ($T_\text{ERM} = T_\star/D$) and saddle rounding ($\delta T_c \sim L^{-1/2}$).
 
 <p align="center">
-  <img src="temperature_pruning/figures/mnist28/accuracy_curves.png" width="92%" alt="MNIST-28 accuracy curves across sigma"/>
+  <img src="assets/temperature_pruning/mnist28/accuracy_curves.png" width="92%" alt="MNIST-28 accuracy curves across sigma"/>
   <br/>
   <em>Recovery curves $A(s; \sigma)$ for MNIST-28 across the full 100-point $\sigma$ grid; colour encodes $\sigma$.</em>
 </p>
@@ -149,7 +149,7 @@ unstructured_pruning/        Main results: weight-level pruning across 4 dataset
   loss_scaling.py              cross-entropy-based scaling diagnostics
   param_scaling.py             critical density vs total parameter count
   plot_3d_scaling.py           3D manifold renderer for s_0(H, L)
-  figures/                     per-dataset PNGs + JSON results
+  (figures now under assets/)                     per-dataset PNGs + JSON results
   checkpoints/                 trained model checkpoints (one per (H, L, repeat))
 
 temperature_pruning/         Empirical test of the SK-with-bond-disorder critical line
@@ -158,7 +158,7 @@ temperature_pruning/         Empirical test of the SK-with-bond-disorder critica
   analysis.py                  per-cell quadratic fit + data-collapse diagnostic
   plots.py                     accuracy curves, critical line, data collapse
   main.py                      argparse driver with per-dataset registry
-  figures/                     critical_line / accuracy_curves / data_collapse per dataset
+  (figures now under assets/)                     critical_line / accuracy_curves / data_collapse per dataset
 
 pruning/                     Legacy structured pruning + LLM notebooks
   pruning.py                   FCNetwork class, sigmoid_fit, path-tracing engine
@@ -180,7 +180,7 @@ assets/                      Cross-cutting reference figures used in the paper
 ```bash
 python -m unstructured_pruning.mnist28_scaling --method wanda
 python -m unstructured_pruning.cifar_resnet_scaling --method wanda
-# outputs to unstructured_pruning/figures/unstructured_figures_<dataset>_<method>/
+# outputs to assets/unstructured_pruning/unstructured_figures_<dataset>_<method>/
 ```
 
 **Temperature/bond-disorder critical-line sweep (uses the trained checkpoints from above):**
@@ -188,7 +188,7 @@ python -m unstructured_pruning.cifar_resnet_scaling --method wanda
 python -m temperature_pruning.main --dataset sklearn       # ~70 s
 python -m temperature_pruning.main --dataset mnist28       # ~6 min
 python -m temperature_pruning.main --dataset cifar_resnet  # ~4 min after feature extraction
-# outputs to temperature_pruning/figures/<dataset>/
+# outputs to assets/temperature_pruning/<dataset>/
 ```
 
 **Re-render plots only from existing JSON:**

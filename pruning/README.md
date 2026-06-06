@@ -126,7 +126,7 @@ Bounds: `A_inf ∈ [0,1]`, `A_0 ∈ [-0.05,1]`, `K_0 ∈ [0, 2·max_K]`, `β ∈
 
 `make_comparison_plot(...)` renders all 5 methods on one grid and a bar
 chart of fit parameters per method. Standalone script writes
-`mnist_figures/pruning_comparison.png`.
+`assets/legacy/mnist/pruning_comparison.png`.
 
 ---
 
@@ -154,7 +154,7 @@ emit JSON results, JSON laws, two PNG figures
 CIFAR features are extracted once via a frozen ImageNet-pretrained ResNet18
 and cached to `$FEATURE_CACHE_DIR` (default `/tmp/cifar_features`).
 
-### Outputs (written to `<dataset>_figures/` or `assets/<dataset>_figures/`)
+### Outputs (written to `assets/legacy/<dataset>/` or `assets/legacy/<dataset>/`)
 
 | File | Content |
 |------|---------|
@@ -179,7 +179,7 @@ WANDA pruning of MLP intermediate neurons):
   `(d_ff, L)`. The y-axis here is *MLP neurons kept* and the recovery is
   `log PPL_base / log PPL_sparse` rather than classification accuracy.
 
-The driver notebook is `Pythia_test.ipynb`; results land in `assets/pythia_figures/`.
+The driver notebook is `Pythia_test.ipynb`; results land in `assets/legacy/pythia/`.
 
 ---
 
@@ -236,4 +236,4 @@ In `k0_scaling.png`:
 - Plot regeneration (without re-running the experiments) lives in
   `replot.py` at the repo root.
 - Aggregated assets used in the top-level README are mirrored under
-  `assets/{mnist,mnist28,cifar,pythia}_figures/`.
+  `assets/legacy/{mnist,mnist28,cifar,pythia}/`.

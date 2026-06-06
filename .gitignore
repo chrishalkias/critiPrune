@@ -19,3 +19,8 @@ unstructured_pruning/checkpoints.zip
 unstructured_pruning/figures/figures.zip
 .ruff_cache
 **/.DS_Store
+# build/cache cruft
+__pycache__/
+*.bak
+*.bak.*
+texput.log

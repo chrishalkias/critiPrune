@@ -61,7 +61,7 @@ Representative observed exponents (R² on the bivariate `H, L` fit):
 | `mnist28_scaling.py`       | Same on **MNIST 28×28** (784-dim). |
 | `cifar_scaling.py`         | Same on **CIFAR-10 + PCA(200)** features. |
 | `cifar_resnet_scaling.py`  | Same on **CIFAR-10 + frozen ResNet18** (512-dim) features. |
-| `param_scaling.py`         | Cross-dataset/method analysis: fits `s_0 ~ a · P^φ` across the 4 datasets × 3 methods grid; produces `figures/param_scaling.png`. |
+| `param_scaling.py`         | Cross-dataset/method analysis: fits `s_0 ~ a · P^φ` across the 4 datasets × 3 methods grid; produces `assets/unstructured_pruning/param_scaling.png`. |
 | `__init__.py`              | Public API re-exports. |
 
 ---
@@ -165,7 +165,7 @@ Two PNGs per `(dataset, method)` cell:
 
 All four drivers are thin wrappers around `run_scaling_experiment`. They
 share `--method {random,magnitude,wanda}`, `--output-dir`, `--n-repeats` CLI
-flags and write to `figures/unstructured_figures_<dataset>_<method>/`.
+flags and write to `assets/unstructured_pruning/unstructured_figures_<dataset>_<method>/`.
 
 | Driver                    | Dataset                          | Input dim | Default `H × L`                                         | Train epochs | Calib `X` for WANDA |
 |---------------------------|----------------------------------|-----------|---------------------------------------------------------|--------------|---------------------|
@@ -185,7 +185,7 @@ chance; this happens occasionally for very small `H` on harder datasets.
 
 ## Cross-dataset analysis: `param_scaling.py`
 
-Reads every `figures/unstructured_figures_<dataset>_<method>/scaling_results.json`,
+Reads every `assets/unstructured_pruning/unstructured_figures_<dataset>_<method>/scaling_results.json`,
 keeps rows with `sigmoid_R² > 0.80`, and fits
 
 ```
@@ -193,7 +193,7 @@ log s_0 = log a + φ · log P
 ```
 
 per `(dataset, method)` cell, where `P` is the network's total parameter
-count. The result is a 4 × 3 panel (`figures/param_scaling.png`) — one
+count. The result is a 4 × 3 panel (`assets/unstructured_pruning/param_scaling.png`) — one
 subplot per `(dataset, method)` — with:
 
 - scatter of `(P, s_0)` coloured by depth `L`,
@@ -254,7 +254,7 @@ is lazy to avoid circularity.
 ## Output directory layout
 
 ```
-unstructured_pruning/figures/
+assets/unstructured_pruning/
 ├── param_scaling.png                                    ← cross-dataset φ figure
 ├── unstructured_figures_<dataset>_<method>/
 │   ├── scaling_results.json     # one row per (H, L, repeat); sigmoid params + R²
@@ -277,4 +277,4 @@ unstructured_pruning/figures/
   `(X_tr, X_val, X_te, y_tr, y_val, y_te)` produced by the loaders in
   `pruning/{mnist,mnist28,cifar}_scaling.py`.
 - Aggregated assets used in the top-level README live under
-  `assets/<dataset>_figures/`.
+  `assets/legacy/<dataset>/`.
