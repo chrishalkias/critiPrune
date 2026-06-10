@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Refresh the manuscript's figure copies from the generated assets/.
 
-The paper figures under ``docs/new_paper/manuscript/figures/`` used to be
+The paper figures under ``.docs/new_paper/manuscript/figures/`` used to be
 symlinks into the experiment output dirs. Those outputs now live under
 ``assets/`` (which is gitignored / local-only), and the manuscript copies are
 real committed-on-disk PNGs so the paper compiles self-contained. After
@@ -20,7 +20,7 @@ import shutil
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FIG = os.path.join(ROOT, 'docs/new_paper/manuscript/figures')
+FIG = os.path.join(ROOT, '.docs/new_paper/manuscript/figures')
 
 # manuscript filename -> source under assets/
 MAPPING = {

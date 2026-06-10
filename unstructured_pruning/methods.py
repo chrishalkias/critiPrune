@@ -28,7 +28,7 @@ UNSTRUCTURED_METHODS = {
     'wanda_global':   'WANDA (input-norm, global)',
     'random_er':      'Random Erdős–Rényi (layer-scaled)',
     'anti_magnitude': 'Anti-magnitude (keep smallest, control)',
-    # --- this project's design (see docs/lessons_about-pruning.md) --------
+    # --- this project's design (see .docs/lessons_about-pruning.md) --------
     'basp':           'BASP (bidirectional activation saliency, per-layer)',
 }
 

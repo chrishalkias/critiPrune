@@ -4,7 +4,7 @@
 Re-uses the existing joint (s, sigma) grid in assets/input_noise/pilot/results.json
 (no retraining). For each pilot cell, extracts iso-A contours at
 A in {0.3, 0.5, 0.7, 0.9}, fits the per-cell rational curve
-(eq. 12 of docs/input_noise.md), and computes the parameter-free
+(eq. 12 of .docs/input_noise.md), and computes the parameter-free
 collapse residual RMS(eta - (1 - xi)) per iso level (eq. 14).
 
 Writes assets/input_noise/extensions/iso_levels/results.json.

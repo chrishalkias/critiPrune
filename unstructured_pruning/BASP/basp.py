@@ -1,6 +1,6 @@
 """BASP — Bidirectional Activation-Saliency Pruning (this project's design).
 
-Rationale (docs/lessons_about-pruning.md): the accuracy of a frozen pruned net
+Rationale (.docs/lessons_about-pruning.md): the accuracy of a frozen pruned net
 is ``A(s) = Phi(SNR(s))`` with ``SNR(s) = (J0 / sqrt(V)) * sqrt(s / (1 - s))``.
 A pruning method cannot change the sigmoid's *shape* — only *where* it sits (the
 critical density ``s_0``). The job of a good method is therefore to keep the

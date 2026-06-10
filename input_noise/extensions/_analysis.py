@@ -4,7 +4,7 @@ All three drivers (iso_levels, depth_cells, seed_replicates) use the same
 two operations:
 
   - extract iso-A contour from a joint (s, sigma) accuracy grid
-  - fit the rational curve (eq. 12 of docs/input_noise.md) per cell
+  - fit the rational curve (eq. 12 of .docs/input_noise.md) per cell
     and the parameter-free collapse residual (eq. 14)
 
 These wrap input_noise.core.iso_accuracy_contour and use the same fit
@@ -61,7 +61,7 @@ def fit_rational(contour: List[Tuple[float, float]],
 
 
 def collapse_coords(contour, sigma2_1, x2):
-    """Return (xi, eta) per eq. (13) of docs/input_noise.md.
+    """Return (xi, eta) per eq. (13) of .docs/input_noise.md.
 
     xi  = (1 - s) * (1 + <x^2> / sigma^2(1))
     eta = sigma^2_iso(s) / sigma^2(1)

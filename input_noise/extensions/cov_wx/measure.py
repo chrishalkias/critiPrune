@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Probe the Cov(W, x) hypothesis from docs/input_noise.md S6.2(b).
+"""Probe the Cov(W, x) hypothesis from .docs/input_noise.md S6.2(b).
 
 For each of the 5 pilot cells, compute a single-number summary of how far
 the trained first-layer weights W^(1) deviate from the factorisation

@@ -8,7 +8,7 @@ compare against the theoretical prediction
         \frac{e^{-z_{1/2}^{2}/2}}{s_0^{1/2}\,(1 - s_0)^{3/2}},
     \qquad z_{1/2}\approx 0.6745,
 
-derived in ``docs/pruning_sigmoid_derivation.md`` by matching the slope of
+derived in ``.docs/pruning_sigmoid_derivation.md`` by matching the slope of
 the logistic ansatz with that of the exact Gaussian-cumulant result at
 :math:`s = s_0`. The constant :math:`c = \mathcal{J}_0/\sqrt{\mathcal{V}}`
 is the effective signal-to-noise of the architecture; the shape
@@ -66,7 +66,7 @@ BETA_SAT_THRESHOLD = BETA_CAP - 0.5
 
 # Half-quantile of the standard normal: z = sqrt(2) * erf^{-1}(1/2) ~ 0.6745.
 # This is the value f(s_0) takes at the midpoint of the excess accuracy g(s),
-# i.e. the constant appearing in the derivation in docs/pruning_sigmoid_derivation.md.
+# i.e. the constant appearing in the derivation in .docs/pruning_sigmoid_derivation.md.
 Z_HALF = 0.6744897501960817
 
 # Prefactor that survives when (2/sqrt(2 pi)) e^{-z^2/2} is absorbed into the
@@ -78,7 +78,7 @@ K0 = (2.0 / np.sqrt(2.0 * np.pi)) * np.exp(-0.5 * Z_HALF ** 2)
 def beta_theory(s0, c):
     """Theoretical sigmoid steepness as a function of the critical density.
 
-    Derived in ``docs/pruning_sigmoid_derivation.md`` by matching the
+    Derived in ``.docs/pruning_sigmoid_derivation.md`` by matching the
     derivative of the logistic ansatz with that of the exact Gaussian-cumulant
     result at :math:`s = s_0`:
 
