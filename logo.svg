@@ -1,0 +1,28 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="critiPrune">
+  <title>critiPrune</title>
+  <defs>
+    <linearGradient id="cp-dark" x1="128" y1="44" x2="128" y2="206" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E1342A"/>
+      <stop offset="1" stop-color="#B5231C"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Angular shards converging to a single apex s0 (GitLab-family sheaf) -->
+  <!-- center shard (deep) -->
+  <path d="M128 206 L116 44 L140 44 Z" fill="url(#cp-dark)"/>
+  <!-- inner shards (mid) -->
+  <path d="M128 206 L84 86 L106 72 Z" fill="#F15B2A"/>
+  <path d="M128 206 L150 72 L172 86 Z" fill="#F15B2A"/>
+  <!-- outer-left shard (amber) -->
+  <path d="M128 206 L40 124 L64 108 Z" fill="#FB8B2E"/>
+
+  <!-- outer-right shard: PRUNED — ghost footprint of the removed blade -->
+  <path d="M128 206 L192 108 L216 124 Z" fill="none" stroke="#FB8B2E"
+        stroke-width="3" stroke-linejoin="round" stroke-dasharray="5 7" opacity="0.4"/>
+  <!-- the severed tip drifting away (the cut piece) -->
+  <path d="M205 96 L223 90 L214 110 Z" fill="#FB8B2E" opacity="0.65"
+        transform="translate(7 -11) rotate(10 214 98)"/>
+
+  <!-- apex marker: the critical point where recovery collapses -->
+  <circle cx="128" cy="206" r="5" fill="#B5231C"/>
+</svg>

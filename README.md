@@ -1,6 +1,10 @@
-# critiPrune
+<p align="center">
+  <img src="logo.svg" width="116" alt="critiPrune logo"/>
+</p>
 
-**Neural Network Pruning as a Phase Transition**
+<h1 align="center">critiPrune</h1>
+
+<p align="center"><strong>Neural Network Pruning as a Phase Transition</strong></p>
 
 > Pruning a trained neural network reveals a sharp, second-order phase transition. Test accuracy as a function of surviving-weight density $s$ collapses onto a universal sigmoid with a critical inflection $s_0$, and $s_0$ obeys clean power-law scaling in width $H$ and depth $L$. Sweeping a controlled inference-time disorder amplitude $\sigma$ in addition to $s$ traces the critical line and singles out the **Sherrington–Kirkpatrick bond-disorder** mean-field universality class as the right physical model.
 
@@ -122,7 +126,7 @@ Across the full 27-cell grid the medians are $\langle J_0^\text{eff}\rangle \app
   <em>Recovery curves $A(s; \sigma)$ for MNIST-28 across the full 100-point $\sigma$ grid; colour encodes $\sigma$.</em>
 </p>
 
-For the theory background of the SK-with-bond-disorder model and what the parabolic critical line tells us, see [`docs/sherrington_kirkpatrick.md`](docs/sherrington_kirkpatrick.md).
+For the theory background of the SK-with-bond-disorder model and what the parabolic critical line tells us, see [`.docs/sherrington_kirkpatrick.md`](.docs/sherrington_kirkpatrick.md).
 
 ---
 
@@ -130,40 +134,48 @@ For the theory background of the SK-with-bond-disorder model and what the parabo
 
 | Scale | Models | Pruning | Metric | Module |
 |---|---|---|---|---|
-| FC unstructured | $H \times L$ grid on 4 datasets | random / magnitude / WANDA | accuracy | `unstructured_pruning/` |
+| FC unstructured | $H \times L$ grid on 4 datasets | random / magnitude / WANDA / BASP | accuracy | `unstructured_pruning/` |
 | FC + inference-time disorder | $H \times L$ grid on 3 datasets | random + Gaussian weight noise | accuracy | `temperature_pruning/` |
+| FC + input noise | $H \times L$ grid | random pruning × input noise $\sigma_x$ | iso-accuracy contour | `input_noise/` |
 | FC structured (legacy) | $H \times L$ on sklearn / CIFAR | signal / weight / WANDA / Taylor / random | accuracy | `unstructured_pruning/base/` |
-| Pythia transformer family | 14M–6.9B | WANDA on MLP neurons | perplexity | `docs/notebooks/Pythia_test.ipynb` |
-| Mixed open-source LLMs | TinyLlama-1.1B, Qwen2.5-0.5B, SmolLM2-1.7B | top-K activation sparsity | loss / perplexity | `docs/notebooks/LLM_pruning_test.ipynb` |
+| Pythia transformer family | 14M–6.9B | WANDA on MLP neurons | perplexity | `.docs/notebooks/Pythia_test.ipynb` |
+| Mixed open-source LLMs | TinyLlama-1.1B, Qwen2.5-0.5B, SmolLM2-1.7B | top-K activation sparsity | loss / perplexity | `.docs/notebooks/LLM_pruning_test.ipynb` |
 
 ---
 
 ## Repository Structure
 
 ```
-unstructured_pruning/        Main results: weight-level pruning across 4 datasets
-  core.py                      shared (H, L) grid runner — train, mask, fit, plot
-  methods.py                   random_masks, magnitude_masks, wanda_masks
-  base/                        shared FC library (relocated from the old pruning/)
-    pruning.py                   FCNetwork class, sigmoid_fit, path-tracing engine
-    {cifar,mnist,mnist28}_scaling.py   dataset loaders + legacy scaling helpers
-    test.py                      unit tests for the FC library
-  runners/                     thin per-dataset wrappers over core (one per dataset)
-  analysis/                    loss/param scaling diagnostics
-  plotting/                    3D manifold + beta-vs-s0 renderers
+unstructured_pruning/   Main experiment — weight-level pruning & density scaling laws
+  core.py                 (H, L) grid runner: train · mask · fit sigmoid · plot (resumable)
+  methods.py              mask generators — random · magnitude · WANDA · BASP
+  base/                   shared FC library: FCNetwork, sigmoid fit, dataset loaders
+  BASP/                   Bidirectional Activation-Saliency Pruning — the project's one-shot pruner
+  runners/                per-dataset CLI sweeps (sklearn · mnist28 · cifar_pca · cifar_resnet) + method comparison
+  analysis/               s0 vs parameter-count & loss scaling, held-out s0 prediction
+  plotting/               3D s0(H, L) manifolds, β-vs-s0 theory overlay, JSON→figure replots
+  toy_examples/           analytically tractable minimal models
+  extensions/             single-axis stratified probe
 
-temperature_pruning/         Empirical test of the SK-with-bond-disorder critical line
-  noise.py                     Gaussian weight-noise temperature knob (per-layer RMS-scaled)
-  core.py                      (sigma, density) sweep runner with resumable JSON output
-  analysis.py                  per-cell quadratic fit + data-collapse diagnostic
-  plots.py                     accuracy curves, critical line, data collapse
-  main.py                      argparse driver with per-dataset registry
+temperature_pruning/    Critical line under inference-time bond disorder (SK universality)
+  noise.py                Gaussian weight-noise temperature knob (per-layer RMS-scaled)
+  core.py                 (σ, density) sweep runner with resumable JSON
+  analysis.py             per-cell parabola fit + F-regime cutoff + data collapse
+  plots.py / main.py      figures + argparse driver (per-dataset registry)
+  extensions/             finite-size-scaling check, seed sweeps
 
-checkpoints/                 trained model checkpoints (one dir per dataset_method, git-ignored)
-docs/paper/                  IsingPruning.tex + IsingPruning.pdf (theory writeup)
-docs/notebooks/              Pythia + mixed-LLM experiment notebooks
-scripts/                     local env setup + scripts/u_scripts/ SLURM batch jobs
-assets/                      generated figures + JSON results (git-ignored)
+input_noise/            Input-noise vs pruning iso-accuracy collapse (η = 1 − ξ)
+  core.py                 joint (s, σ_x) grid + iso-accuracy contour extraction
+  runners/                pilot run + resumable cluster sweep + aggregation
+  analysis/, plotting/    rational-curve fit and signal-to-noise collapse figures
+  extensions/             falsifiability, iso-levels, Cov(W, x), depth-cell probes
+
+tools/                  Cross-cutting post-processing — refit sigmoids, overlay plots, paper-figure sync
+scripts/               Local env setup + scripts/u_scripts/ SLURM batch jobs
+checkpoints/           Trained checkpoints, one dir per <dataset>_<method>   (git-ignored)
+assets/                Generated figures + JSON results                      (git-ignored)
+.docs/                 Theory write-ups, derivations, notebooks, specs        (git-ignored)
+logo.svg · README.md · requirements.txt · LICENSE
 ```
 
 ---
@@ -221,7 +233,7 @@ accs, baseline = evaluate_masked_accuracy(noisy, X_test, y_test, masks)
 ```bash
 pip install numpy scipy scikit-learn matplotlib torch torchvision
 
-# Optional: LLM experiments in docs/notebooks/
+# Optional: LLM experiments in .docs/notebooks/
 pip install transformers datasets accelerate
 ```
 
