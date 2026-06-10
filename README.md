@@ -60,7 +60,7 @@ The width exponent $\alpha \in [-0.43, -0.31]$ is consistently negative — wide
 <p align="center">
   <img src="figs/recovery_curves.png" width="90%" alt="MNIST-28 WANDA recovery curves"/>
   <br/>
-  <em>Recovery curves $A(s)$ for MNIST-28 with WANDA pruning across the $(H, L)$ grid.</em>
+  <em>Recovery curves $A(s)$ for MNIST-28 with WANDA pruning at depth $L=4$; the transition sharpens and shifts to lower density as width $H$ grows.</em>
 </p>
 
 ### 2. Predicting $s_0$ from the weights alone (`unstructured_pruning/analysis/`)
