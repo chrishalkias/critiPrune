@@ -20,7 +20,7 @@ of exponents:
 Key differences from mnist_scaling.py
 --------------------------------------
 * Input dimension: 784 instead of 64 — uses batched path-tracing engine
-  (evaluate_path_accuracy from pruning.py) for memory efficiency.
+  (evaluate_path_accuracy from base/pruning.py) for memory efficiency.
 * Pruning method: WANDA only (Sun et al., 2023) — same as cifar_scaling.py,
   enabling direct exponent comparison across datasets.
 * Architecture grid: H ∈ {64, 128, 256, 512} × L ∈ {2, 3, 5, 7, 10}
@@ -50,7 +50,7 @@ import matplotlib.pyplot as plt
 
 warnings.filterwarnings('ignore')
 
-from pruning import (
+from unstructured_pruning.base import (
     FCNetwork, accuracy,
     precompute_pruning_scores, evaluate_path_accuracy,
     sigmoid_fn, fit_sigmoid,

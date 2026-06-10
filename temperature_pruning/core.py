@@ -30,7 +30,7 @@ from unstructured_pruning.core import (
     load_fc_checkpoint,
 )
 from unstructured_pruning.methods import random_masks
-from pruning.pruning import fit_sigmoid
+from unstructured_pruning.base.pruning import fit_sigmoid
 
 from .noise import add_weight_noise, layer_weight_rms
 
@@ -175,7 +175,7 @@ def run_temperature_pruning_experiment(
         Pruning density grid. Defaults to ``unstructured_pruning.core.DEFAULT_DENSITIES``.
     ckpt_dir : str
         Directory of saved checkpoints (e.g. the existing
-        ``unstructured_pruning/checkpoints/unstructured_figures_sklearn_random``).
+        ``checkpoints/sklearn_random``).
     output_dir : str
         Where to write ``results.json`` (and later figures).
     repeat_ids : tuple of int

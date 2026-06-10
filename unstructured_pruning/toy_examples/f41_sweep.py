@@ -97,7 +97,7 @@ def _cifar_resnet_loader(data_dir):
     and currently ignored (the underlying loader caches features under
     ``$FEATURE_CACHE_DIR``)."""
     del data_dir
-    from pruning.cifar_scaling import load_cifar10
+    from unstructured_pruning.base.cifar_scaling import load_cifar10
     return _six_tuple_to_four(load_cifar10)
 
 
@@ -106,7 +106,7 @@ def _digits_loader(data_dir):
     dims). ``data_dir`` is accepted for signature uniformity and ignored
     (sklearn ships the data with the wheel)."""
     del data_dir
-    from pruning.mnist_scaling import load_data
+    from unstructured_pruning.base.mnist_scaling import load_data
     return _six_tuple_to_four(load_data)
 
 

@@ -37,7 +37,7 @@ temperature_pruning/
 ## Outputs vs. data
 
 - **Figures + accompanying JSON → `assets/temperature_pruning/<dataset>/` and `assets/temperature_pruning/fss_check/`.**
-- Checkpoints are reused from `unstructured_pruning/checkpoints/` (not duplicated here).
+- Checkpoints are reused from `checkpoints/` (not duplicated here).
 
 ## Run
 

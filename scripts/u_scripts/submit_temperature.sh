@@ -5,10 +5,10 @@
 # (noise, mask) bundles per (H, L, sigma), producing error bars on p_c.
 #
 # Usage:
-#   bash u_scripts/submit_temperature.sh                   # 3 jobs, default account=liacs
-#   bash u_scripts/submit_temperature.sh <account>
-#   DATASETS="sklearn" bash u_scripts/submit_temperature.sh     # subset
-#   N_TRIALS=10 bash u_scripts/submit_temperature.sh            # fewer trials
+#   bash scripts/u_scripts/submit_temperature.sh                   # 3 jobs, default account=liacs
+#   bash scripts/u_scripts/submit_temperature.sh <account>
+#   DATASETS="sklearn" bash scripts/u_scripts/submit_temperature.sh     # subset
+#   N_TRIALS=10 bash scripts/u_scripts/submit_temperature.sh            # fewer trials
 #
 # Run from the project root.
 set -euo pipefail
@@ -63,7 +63,7 @@ for DATASET in $DATASETS; do
         --mem="${MEM[$DATASET]}" \
         --export=ALL,DATASET="$DATASET",N_TRIALS="$N_TRIALS",N_MASK_SEEDS="$N_MASK_SEEDS",N_NOISE_SEEDS="$N_NOISE_SEEDS" \
         --parsable \
-        u_scripts/temperature_pruning.sbatch)
+        scripts/u_scripts/temperature_pruning.sbatch)
     printf "  %-20s  job=%s  time=%s  mem=%s\n" \
         "$JOB_NAME" "$JOB_ID" "$TIME" "${MEM[$DATASET]}"
 done

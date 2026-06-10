@@ -9,7 +9,7 @@
 #
 # Submits a 12-task array on cpu-zen4. Each task processes one
 # (dataset, method) directory under
-# unstructured_pruning/checkpoints/. Resumable: re-running the array
+# checkpoints/. Resumable: re-running the array
 # will skip any (H, L, r) cells whose per-cell JSON already exists.
 
 set -euo pipefail

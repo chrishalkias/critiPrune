@@ -78,7 +78,7 @@ def evaluate_masked_accuracy(model, X_test, y_test, mask_sets):
     return accs, normal_acc
 
 
-# --- Scaling law fitting (factored from pruning/mnist_scaling.py) --------------
+# --- Scaling law fitting (factored from base/mnist_scaling.py) --------------
 
 def _power_law_2d(HL, a, alpha, gamma):
     H, L = HL
@@ -152,7 +152,7 @@ def fit_scaling_laws(results, min_r2=0.80):
 DEFAULT_DENSITIES = [0.01, 0.02, 0.05, 0.075, 0.10, 0.15, 0.20, 0.30,
                      0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.00]
 
-CHECKPOINT_BASE = 'unstructured_pruning/checkpoints'
+CHECKPOINT_BASE = 'checkpoints'
 
 
 def load_fc_checkpoint(ckpt_path, device='cpu'):
@@ -162,7 +162,7 @@ def load_fc_checkpoint(ckpt_path, device='cpu'):
     downstream tools (e.g. ``unstructured_pruning.analysis.loss_scaling``) only
     need to import from the ``unstructured_pruning`` package.
     """
-    from pruning.pruning import FCNetwork  # local import: heavy + side effects
+    from unstructured_pruning.base.pruning import FCNetwork  # local import: heavy + side effects
     ckpt = torch.load(ckpt_path, map_location='cpu', weights_only=True)
     model = FCNetwork(**ckpt['arch'])
     model.load_state_dict(ckpt['state_dict'])
@@ -214,7 +214,7 @@ def run_scaling_experiment(
     and ``s0_scaling.png`` into ``output_dir``.  Returns ``(results, scaling)``.
     """
     # Local import to avoid circularity at module load time
-    from pruning.pruning import FCNetwork, fit_sigmoid
+    from unstructured_pruning.base.pruning import FCNetwork, fit_sigmoid
 
     if densities is None:
         densities = DEFAULT_DENSITIES
@@ -382,7 +382,7 @@ def _best_per_cell(rows):
 
 def make_plots(results, scaling, output_dir, title_prefix=''):
     """Two figures: recovery curves (top panels per L) + s_0 scaling (dot+line | heatmap)."""
-    from pruning.pruning import sigmoid_fn  # lazy import
+    from unstructured_pruning.base.pruning import sigmoid_fn  # lazy import
 
     good = [r for r in results
             if r.get('sigmoid_R2') is not None and r['sigmoid_R2'] > 0.80]

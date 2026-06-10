@@ -1,7 +1,7 @@
 """CLI entry: temperature/pruning sweep on a chosen dataset.
 
 Sweeps the (sigma, density) grid with random Bernoulli pruning on the
-``unstructured_figures_{dataset}_random`` checkpoint family and writes
+``{dataset}_random`` checkpoint family and writes
 results.json + the three diagnostic figures.
 
 Usage:
@@ -30,16 +30,16 @@ from .core import DEFAULT_SIGMAS, run_temperature_pruning_experiment
 from .plotting.plots import make_all_plots
 
 
-_CKPT_BASE = 'unstructured_pruning/checkpoints'
+_CKPT_BASE = 'checkpoints'
 
 
 def _load_sklearn():
-    from pruning.pruning import load_digits_data
+    from unstructured_pruning.base.pruning import load_digits_data
     return load_digits_data()
 
 
 def _load_mnist28():
-    from pruning.mnist28_scaling import load_mnist28
+    from unstructured_pruning.base.mnist28_scaling import load_mnist28
     return load_mnist28()
 
 
@@ -57,7 +57,7 @@ def _load_cifar_resnet():
     import numpy as np
     from sklearn.preprocessing import StandardScaler
 
-    from pruning.cifar_scaling import (
+    from unstructured_pruning.base.cifar_scaling import (
         _load_cifar10_torchvision, _load_cifar10_raw, extract_cnn_features,
     )
 
@@ -99,7 +99,7 @@ def _load_cifar_resnet():
 DATASETS = {
     'sklearn': {
         'loader': _load_sklearn,
-        'ckpt_dir': f'{_CKPT_BASE}/unstructured_figures_sklearn_random',
+        'ckpt_dir': f'{_CKPT_BASE}/sklearn_random',
         'default_h': [16, 32, 64],
         'default_l': [2, 3, 5],
         'default_repeat': 2,
@@ -107,7 +107,7 @@ DATASETS = {
     },
     'mnist28': {
         'loader': _load_mnist28,
-        'ckpt_dir': f'{_CKPT_BASE}/unstructured_figures_mnist28_random',
+        'ckpt_dir': f'{_CKPT_BASE}/mnist28_random',
         'default_h': [128, 192, 256],
         'default_l': [3, 5, 7],
         'default_repeat': 2,
@@ -115,7 +115,7 @@ DATASETS = {
     },
     'cifar_resnet': {
         'loader': _load_cifar_resnet,
-        'ckpt_dir': f'{_CKPT_BASE}/unstructured_figures_cifar_resnet_random',
+        'ckpt_dir': f'{_CKPT_BASE}/cifar_resnet_random',
         'default_h': [160, 192, 224],
         'default_l': [3, 5, 7],
         'default_repeat': 0,

@@ -13,9 +13,9 @@
 # Input-noise / pruning iso-accuracy sweep across all 12 (dataset, method)
 # combinations. One array task per combination; each task walks all
 # saved checkpoints in
-# ``unstructured_pruning/checkpoints/unstructured_figures_<ds>_<m>/``
+# ``checkpoints/<ds>_<m>/``
 # and writes one JSON per cell under
-# ``input_noise/results_cluster/unstructured_figures_<ds>_<m>/``.
+# ``input_noise/results_cluster/<ds>_<m>/``.
 #
 # Submit (from project root on ALICE):
 #   sbatch --account=<PROJECT> input_noise/submit.sbatch

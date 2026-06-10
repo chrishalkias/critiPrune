@@ -12,9 +12,9 @@
 # resource bookings honest while still leaving headroom.
 #
 # Usage:
-#   bash u_scripts/submit_more.sh [account]                         # default: liacs
-#   DATASETS=mnist28 METHODS=random bash u_scripts/submit_more.sh   # subset
-#   N_REPEATS=2 bash u_scripts/submit_more.sh                       # repeats
+#   bash scripts/u_scripts/submit_more.sh [account]                         # default: liacs
+#   DATASETS=mnist28 METHODS=random bash scripts/u_scripts/submit_more.sh   # subset
+#   N_REPEATS=2 bash scripts/u_scripts/submit_more.sh                       # repeats
 #
 # Run from the project root.
 set -euo pipefail
@@ -23,7 +23,7 @@ PROJECT="${1:-liacs}"
 mkdir -p slurm_logs
 
 # Per-dataset base walltime in seconds for the *original* coarse grid.
-# Mirrors u_scripts/submit.sh.
+# Mirrors scripts/u_scripts/submit.sh.
 declare -A TIME_SEC=(
     [sklearn]=7200       # 02:00:00 — original coarse grid
     [mnist28]=36000      # 10:00:00
@@ -82,7 +82,7 @@ for DATASET in $DATASETS; do
             --mem="${MEM[$DATASET]}" \
             --export=ALL,DATASET="$DATASET",METHOD="$METHOD",N_REPEATS="$N_REPEATS" \
             --parsable \
-            u_scripts/more_combinations.sbatch)
+            scripts/u_scripts/more_combinations.sbatch)
         printf "  %-30s  job=%s  time=%s  mem=%s\n" \
             "$JOB_NAME" "$JOB_ID" "$SCALED_TIME" "${MEM[$DATASET]}"
     done

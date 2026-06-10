@@ -28,6 +28,8 @@ UNSTRUCTURED_METHODS = {
     'wanda_global':   'WANDA (input-norm, global)',
     'random_er':      'Random Erdős–Rényi (layer-scaled)',
     'anti_magnitude': 'Anti-magnitude (keep smallest, control)',
+    # --- this project's design (see docs/lessons_about-pruning.md) --------
+    'basp':           'BASP (bidirectional activation saliency, per-layer)',
 }
 
 
@@ -396,6 +398,13 @@ def random_er_masks(model, densities, n_seeds=3, base_seed=42):
 
 
 # ---------------------------------------------------------------------------
+# BASP — Bidirectional Activation-Saliency Pruning (this project's design)
+# ---------------------------------------------------------------------------
+# The algorithm lives in its own package, unstructured_pruning/BASP/. The
+# dispatcher below imports it lazily so methods.py stays import-cycle free.
+
+
+# ---------------------------------------------------------------------------
 # Unified dispatcher
 # ---------------------------------------------------------------------------
 def build_masks(method, model, densities, *, X_calib=None, y_calib=None,
@@ -430,4 +439,7 @@ def build_masks(method, model, densities, *, X_calib=None, y_calib=None,
         return gradient_masks(model, densities, X_calib, y_calib, n_seeds=1)
     if method == 'grasp':
         return grasp_masks(model, densities, X_calib, y_calib, n_seeds=1)
+    if method == 'basp':
+        from .BASP import basp_masks  # lazy: BASP imports helpers from here
+        return basp_masks(model, densities, X_calib, n_seeds=1)
     raise ValueError(f"unknown method: {method}")

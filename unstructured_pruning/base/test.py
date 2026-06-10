@@ -32,7 +32,7 @@ import torch.nn as nn
 # Ensure the refactored modules are importable
 sys.path.insert(0, os.path.dirname(__file__))
 
-from pruning import (
+from unstructured_pruning.base import (
     FCNetwork,
     accuracy,
     sigmoid_fn,

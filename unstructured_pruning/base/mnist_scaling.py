@@ -35,7 +35,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # --- Import from refactored pruning module ------------------------------------
 
-from pruning import (
+from unstructured_pruning.base import (
     FCNetwork, accuracy, sigmoid_fn, fit_sigmoid,
 )
 

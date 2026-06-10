@@ -34,7 +34,7 @@ if [[ "$EXTRA_REPEATS_ONLY" == "1" ]]; then
     EXTRA_FLAG="--extra-repeats-only"
 fi
 
-OUTPUT_DIR="unstructured_pruning/figures/unstructured_figures_${DATASET}_${METHOD}"
+OUTPUT_DIR="assets/unstructured_pruning/${DATASET}_${METHOD}"
 mkdir -p "$OUTPUT_DIR"
 
 echo "=================================================================="

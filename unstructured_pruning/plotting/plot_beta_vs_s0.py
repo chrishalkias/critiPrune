@@ -17,7 +17,7 @@ is the effective signal-to-noise of the architecture; the shape
 :math:`\log\beta`, restricted to resolved (non-saturated) cells, and
 overlay the resulting curve.
 
-Each ``assets/unstructured_pruning/unstructured_figures_<dataset>_<method>``
+Each ``assets/unstructured_pruning/<dataset>_<method>``
 directory holds one ``scaling_results.json`` with one row per
 ``(H, L, repeat)`` cell, including the per-cell sigmoid fit parameters
 ``sigmoid_s_0`` and ``sigmoid_beta``. This script scatters
@@ -528,12 +528,13 @@ def main(base='assets/unstructured_pruning', min_r2=0.80):
 
     per_cell_data = {}
     saved, skipped = [], []
-    for d in sorted(glob.glob(os.path.join(base, 'unstructured_figures_*'))):
+    for d in sorted(p for m in ('magnitude', 'random', 'wanda')
+                    for p in glob.glob(os.path.join(base, f'*_{m}'))):
         results_p = os.path.join(d, 'scaling_results.json')
         if not os.path.isfile(results_p):
             skipped.append((d, 'no scaling_results.json'))
             continue
-        token = os.path.basename(d).replace('unstructured_figures_', '')
+        token = os.path.basename(d)
         dataset, method = _parse_token(token)
         with open(results_p) as f:
             rows = json.load(f)
@@ -566,7 +567,7 @@ def main(base='assets/unstructured_pruning', min_r2=0.80):
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('--base', default='assets/unstructured_pruning',
-                    help='directory containing unstructured_figures_* subdirs')
+                    help='directory containing <dataset>_<method> subdirs')
     ap.add_argument('--min-r2', type=float, default=0.80,
                     help='minimum sigmoid R^2 to keep a cell')
     args = ap.parse_args()

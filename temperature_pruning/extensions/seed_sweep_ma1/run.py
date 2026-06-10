@@ -30,8 +30,8 @@ _ROOT = os.path.abspath(os.path.join(_HERE, '..', '..', '..'))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from pruning.pruning import FCNetwork, fit_sigmoid
-from pruning.mnist28_scaling import load_mnist28
+from unstructured_pruning.base.pruning import FCNetwork, fit_sigmoid
+from unstructured_pruning.base.mnist28_scaling import load_mnist28
 from unstructured_pruning.core import DEFAULT_DENSITIES, evaluate_masked_accuracy
 from unstructured_pruning.methods import magnitude_masks
 from temperature_pruning.noise import add_weight_noise

@@ -4,7 +4,7 @@ r"""Validation-loss vs. critical-density scaling.
 For every $(H, L)$ configuration of a chosen dataset/method this script
 
     1. loads each saved checkpoint $(H, L, r)$ from
-       ``unstructured_pruning/checkpoints/unstructured_figures_<dataset>_<method>/``,
+       ``checkpoints/<dataset>_<method>/``,
     2. builds pruning masks at every density $s \in$ ``DEFAULT_DENSITIES``
        using the same routine as the scaling experiment,
     3. measures the validation cross-entropy
@@ -182,7 +182,7 @@ def compute_per_config(dataset, method, *, force=False, cache_root):
     # -- need to actually compute --
     figures_dir = os.path.join(
         'unstructured_pruning', 'figures',
-        f'unstructured_figures_{dataset}_{method}')
+        f'{dataset}_{method}')
     sr_p = os.path.join(figures_dir, 'scaling_results.json')
     if not os.path.isfile(sr_p):
         print(f'  no scaling_results.json at {sr_p}')
@@ -204,7 +204,7 @@ def compute_per_config(dataset, method, *, force=False, cache_root):
     print(f'  device: {device}   |  cells: {len(rows)}')
 
     ckpt_dir = os.path.join(
-        CHECKPOINT_BASE, f'unstructured_figures_{dataset}_{method}')
+        CHECKPOINT_BASE, f'{dataset}_{method}')
 
     per_repeat = []
     t0 = time.time()

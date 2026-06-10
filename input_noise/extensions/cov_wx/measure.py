@@ -26,9 +26,9 @@ _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from pruning.mnist_scaling import load_data as load_digits      # noqa: E402
-from pruning.mnist28_scaling import load_mnist28                # noqa: E402
-from pruning.pruning import FCNetwork                           # noqa: E402
+from unstructured_pruning.base.mnist_scaling import load_data as load_digits      # noqa: E402
+from unstructured_pruning.base.mnist28_scaling import load_mnist28                # noqa: E402
+from unstructured_pruning.base.pruning import FCNetwork                           # noqa: E402
 
 CELLS = [
     ('digits',  64,  2),

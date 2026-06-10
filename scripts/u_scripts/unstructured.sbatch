@@ -5,7 +5,7 @@
 #   DATASET : sklearn | mnist28 | cifar_pca | cifar_resnet
 #   METHOD  : random  | magnitude | wanda
 #
-# Submit through u_scripts/submit.sh, which sets time/mem overrides per dataset.
+# Submit through scripts/u_scripts/submit.sh, which sets time/mem overrides per dataset.
 #
 #SBATCH --job-name=u_pruning
 #SBATCH --partition=gpu-l4-24g
@@ -34,7 +34,7 @@ case "$DATASET" in
     *) echo "unknown DATASET: $DATASET" >&2; exit 2 ;;
 esac
 
-OUTPUT_DIR="unstructured_pruning/figures/unstructured_figures_${DATASET}_${METHOD}"
+OUTPUT_DIR="assets/unstructured_pruning/${DATASET}_${METHOD}"
 mkdir -p "$OUTPUT_DIR"
 
 echo "=================================================================="

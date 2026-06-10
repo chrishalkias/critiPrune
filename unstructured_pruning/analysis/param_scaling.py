@@ -76,7 +76,7 @@ def fit_param_scaling(P_arr, s0_arr):
 def load_good_rows(dataset, method):
     path = os.path.join(
         FIGURES_DIR,
-        f'unstructured_figures_{dataset}_{method}',
+        f'{dataset}_{method}',
         'scaling_results.json',
     )
     if not os.path.exists(path):

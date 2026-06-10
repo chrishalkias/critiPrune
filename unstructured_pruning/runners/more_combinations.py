@@ -14,7 +14,7 @@ Usage
     python -m unstructured_pruning.runners.more_combinations \\
         --dataset mnist28 --method random [--n-repeats 1]
 
-Outputs land in ``assets/unstructured_pruning/unstructured_figures_<dataset>_<method>/``
+Outputs land in ``assets/unstructured_pruning/<dataset>_<method>/``
 (same directory as the original scan), so plots and scaling-law fits get
 regenerated with the denser grid automatically.
 """
@@ -101,7 +101,7 @@ def _resolve_input_size(dataset, cfg):
     if cfg['input_size'] is not None:
         return cfg['input_size']
     if dataset == 'cifar_resnet':
-        from pruning.cifar_scaling import FEATURE_DIM
+        from unstructured_pruning.base.cifar_scaling import FEATURE_DIM
         return FEATURE_DIM
     raise RuntimeError(f"input_size unresolved for dataset {dataset}")
 
@@ -133,7 +133,7 @@ def main(dataset, method, output_dir=None, n_repeats=1,
     cfg = DATASETS[dataset]
     if output_dir is None:
         output_dir = ('assets/unstructured_pruning/'
-                      f'unstructured_figures_{dataset}_{method}')
+                      f'{dataset}_{method}')
 
     H_values = sorted(set(cfg['H_base']) | set(cfg['H_extra']))
     L_values = sorted(set(cfg['L_base']) | set(cfg['L_extra']))

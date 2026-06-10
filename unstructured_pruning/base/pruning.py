@@ -24,7 +24,7 @@ Optimisations
 
 API (for importing)
 -------------------
-  from pruning import (
+  from unstructured_pruning.base import (
       FCNetwork, accuracy,
       precompute_pruning_scores, evaluate_path_accuracy,
       sigmoid_fn, fit_sigmoid,

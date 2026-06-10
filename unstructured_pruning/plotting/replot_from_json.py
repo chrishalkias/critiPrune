@@ -2,7 +2,7 @@
 r"""Regenerate ``scaling_curves.png`` and ``s0_scaling.png`` from the cached
 per-cell JSON, without retraining.
 
-Each ``assets/unstructured_pruning/unstructured_figures_<dataset>_<method>/``
+Each ``assets/unstructured_pruning/<dataset>_<method>/``
 directory holds ``scaling_results.json`` (per-cell sigmoid fits + raw
 recovery curves) and ``scaling_laws.json`` (bivariate power-law fits).
 Both PNGs are produced by ``unstructured_pruning.core.make_plots``,
@@ -46,9 +46,10 @@ def _safe_label(token: str) -> str:
 
 
 def main(base='assets/unstructured_pruning'):
-    dirs = sorted(glob.glob(os.path.join(base, 'unstructured_figures_*')))
+    dirs = sorted(p for m in ('magnitude', 'random', 'wanda')
+                  for p in glob.glob(os.path.join(base, f'*_{m}')))
     if not dirs:
-        print(f'No unstructured_figures_* directories under {base}')
+        print(f'No <dataset>_<method> cell directories under {base}')
         return
 
     written, skipped = [], []
@@ -62,7 +63,7 @@ def main(base='assets/unstructured_pruning'):
             results = json.load(f)
         scaling = (json.load(open(scaling_p))
                    if os.path.isfile(scaling_p) else None)
-        token = os.path.basename(d).replace('unstructured_figures_', '')
+        token = os.path.basename(d)
         paths = make_plots(results, scaling, d, title_prefix=_safe_label(token))
         if paths:
             written.extend(paths)
@@ -79,6 +80,6 @@ def main(base='assets/unstructured_pruning'):
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('--base', default='assets/unstructured_pruning',
-                    help='directory containing unstructured_figures_* subdirs')
+                    help='directory containing <dataset>_<method> subdirs')
     args = ap.parse_args()
     main(base=args.base)

@@ -6,7 +6,7 @@ Sibling of ``plot_3d_scaling.py``. Reuses the ``render_3d`` rendering
 function from that module after swapping the aggregation field names
 and re-fitting the s_0 = a H^alpha L^gamma power law on v2 data.
 
-Writes outputs to ``assets/unstructured_pruning/unstructured_figures_*/
+Writes outputs to ``assets/unstructured_pruning/*/
 s0_3d_v2.png`` (sibling of the v1 ``s0_3d.png``).
 """
 from __future__ import annotations
@@ -92,7 +92,8 @@ def main(base_dir='assets/unstructured_pruning'):
     base._aggregate = _aggregate_v2
 
     saved, skipped = [], []
-    for d in sorted(glob.glob(os.path.join(base_dir, 'unstructured_figures_*'))):
+    for d in sorted(p for m in ('magnitude', 'random', 'wanda')
+                    for p in glob.glob(os.path.join(base_dir, f'*_{m}'))):
         results_p = os.path.join(d, 'scaling_results.json')
         if not os.path.isfile(results_p):
             skipped.append((d, 'no scaling_results.json'))
@@ -102,7 +103,7 @@ def main(base_dir='assets/unstructured_pruning'):
         if s0_pl is None:
             skipped.append((d, 'power-law fit failed or too few v2 cells'))
             continue
-        token = (os.path.basename(d).replace('unstructured_figures_', ''))
+        token = os.path.basename(d)
         out = os.path.join(d, 's0_3d_v2.png')
         scaling = {'s0': s0_pl}
         p = base.render_3d(results, scaling, out, dataset_method=token)

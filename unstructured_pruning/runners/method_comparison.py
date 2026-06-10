@@ -40,13 +40,13 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from pruning.pruning import FCNetwork                          # noqa: E402
+from unstructured_pruning.base.pruning import FCNetwork                          # noqa: E402
 from unstructured_pruning.core import evaluate_masked_accuracy  # noqa: E402
 from unstructured_pruning.methods import (                      # noqa: E402
     UNSTRUCTURED_METHODS, build_masks,
 )
 
-CHECKPOINT_BASE = 'unstructured_pruning/checkpoints'
+CHECKPOINT_BASE = 'checkpoints'
 OUTPUT_BASE     = 'assets/unstructured_pruning/method_comparison'
 
 # Dense density grid -> smooth A(s) curves.
@@ -55,13 +55,13 @@ DEFAULT_DENSITIES = [round(v, 3) for v in np.linspace(0.02, 1.0, 25)]
 
 def _load_dataset(dataset):
     if dataset == 'mnist28':
-        from pruning.mnist28_scaling import load_mnist28
+        from unstructured_pruning.base.mnist28_scaling import load_mnist28
         return load_mnist28()
     if dataset == 'sklearn':
-        from pruning.mnist_scaling import load_data
+        from unstructured_pruning.base.mnist_scaling import load_data
         return load_data()
     if dataset == 'cifar_resnet':
-        from pruning.cifar_scaling import load_cifar10
+        from unstructured_pruning.base.cifar_scaling import load_cifar10
         return load_cifar10()
     if dataset == 'cifar_pca':
         from unstructured_pruning.runners.cifar_scaling import load_cifar_pca
@@ -71,7 +71,7 @@ def _load_dataset(dataset):
 
 def _checkpoint_paths(dataset, H, L):
     """All repeats of the (H, L) cell from the method-agnostic _random family."""
-    d = os.path.join(CHECKPOINT_BASE, f'unstructured_figures_{dataset}_random')
+    d = os.path.join(CHECKPOINT_BASE, f'{dataset}_random')
     paths = sorted(glob.glob(os.path.join(d, f'H{H}_L{L}_r*.pt')))
     if not paths:
         raise SystemExit(f'no checkpoints for H{H}_L{L} under {d}')

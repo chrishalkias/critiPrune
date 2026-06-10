@@ -2,7 +2,7 @@
 """Cluster-scale input-noise iso-accuracy sweep.
 
 Walks every saved FCNetwork checkpoint under
-``unstructured_pruning/checkpoints/unstructured_figures_<dataset>_<method>/``,
+``checkpoints/<dataset>_<method>/``,
 loads the trained weights, and runs:
 
   - a 1-D ``A(sigma; s=1)`` input-noise sweep,
@@ -45,19 +45,19 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from pruning.pruning import FCNetwork                          # noqa: E402
+from unstructured_pruning.base.pruning import FCNetwork                          # noqa: E402
 
 from input_noise.core import (                                 # noqa: E402
     evaluate_joint,
     evaluate_noisy_accuracy,
 )
 
-CHECKPOINT_BASE = 'unstructured_pruning/checkpoints'
+CHECKPOINT_BASE = 'checkpoints'
 RESULTS_BASE    = 'input_noise/results_cluster'
 
 # (X_tr, X_val, X_te, y_tr, y_val, y_te) per dataset key.
 def _load_mnist28():
-    from pruning.mnist28_scaling import load_mnist28
+    from unstructured_pruning.base.mnist28_scaling import load_mnist28
     return load_mnist28()
 
 def _load_cifar_pca():
@@ -65,11 +65,11 @@ def _load_cifar_pca():
     return load_cifar_pca()
 
 def _load_cifar_resnet():
-    from pruning.cifar_scaling import load_cifar10
+    from unstructured_pruning.base.cifar_scaling import load_cifar10
     return load_cifar10()
 
 def _load_sklearn():
-    from pruning.mnist_scaling import load_data
+    from unstructured_pruning.base.mnist_scaling import load_data
     return load_data()
 
 DATASET_LOADERS = {
@@ -212,7 +212,7 @@ def main():
     if args.torch_threads is not None:
         torch.set_num_threads(int(args.torch_threads))
 
-    dirname = f'unstructured_figures_{args.dataset}_{args.method}'
+    dirname = f'{args.dataset}_{args.method}'
     ckpt_dir   = os.path.join(args.checkpoint_base, dirname)
     output_dir = os.path.join(args.results_base,    dirname)
     if not os.path.isdir(ckpt_dir):

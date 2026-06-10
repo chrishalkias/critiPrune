@@ -16,7 +16,7 @@
 #
 # Configure the cell via env vars (defaults = mnist28 H192 L5, the paper cell):
 #   DATASET=mnist28  HVAL=192  LVAL=5  sbatch --account=<PROJECT> \
-#       u_scripts/method_comparison.sbatch
+#       scripts/u_scripts/method_comparison.sbatch
 #
 # Output: unstructured_pruning/figures/method_comparison/<dataset>_H<H>_L<L>.{json,png}
 

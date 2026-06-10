@@ -37,7 +37,7 @@ STRATA = [
 ]
 
 ROOT = Path('/Users/chrischalkias/Projects/critiPrune')
-FIG_ROOT = ROOT / 'unstructured_pruning' / 'figures'
+FIG_ROOT = ROOT / 'assets' / 'unstructured_pruning'
 OUT_DIR = FIG_ROOT / 'extensions' / 'single_axis_stratified'
 
 
@@ -166,7 +166,7 @@ def write_report(results: dict, skipped: list) -> str:
 def main() -> None:
     results, skipped = {}, []
     for suffix, dset, method, d_in in STRATA:
-        path = FIG_ROOT / f'unstructured_figures_{suffix}' / 'scaling_results.json'
+        path = FIG_ROOT / f'{suffix}' / 'scaling_results.json'
         if not path.exists():
             skipped.append((suffix, 'json missing'))
             continue

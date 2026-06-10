@@ -56,19 +56,19 @@ The sigmoid fit succeeds with adjusted $R^2 > 0.9$ in the overwhelming majority 
 The width exponent $\alpha \in [-0.43, -0.31]$ is consistently negative — wider networks are more compressible — and the depth exponent $\gamma \in [0.49, 0.77]$ is consistently positive. These signs match the layered mean-field prediction $p_c \sim L/H$ from the toy model.
 
 <p align="center">
-  <img src="assets/unstructured_pruning/unstructured_figures_mnist28_wanda/scaling_curves.png" width="90%" alt="MNIST-28 unstructured WANDA scaling curves"/>
+  <img src="assets/unstructured_pruning/mnist28_wanda/scaling_curves.png" width="90%" alt="MNIST-28 unstructured WANDA scaling curves"/>
   <br/>
   <em>Recovery curves $A(s)$ for MNIST-28 with WANDA pruning across the $(H, L)$ grid.</em>
 </p>
 
 <p align="center">
-  <img src="assets/unstructured_pruning/unstructured_figures_cifar_resnet_wanda/scaling_curves.png" width="90%" alt="CIFAR-ResNet18 unstructured WANDA scaling curves"/>
+  <img src="assets/unstructured_pruning/cifar_resnet_wanda/scaling_curves.png" width="90%" alt="CIFAR-ResNet18 unstructured WANDA scaling curves"/>
   <br/>
   <em>Same on CIFAR-10 with frozen ResNet18 features.</em>
 </p>
 
 <p align="center">
-  <img src="assets/unstructured_pruning/unstructured_figures_mnist28_wanda/s0_3d.png" width="80%" alt="MNIST-28 s0 manifold"/>
+  <img src="assets/unstructured_pruning/mnist28_wanda/s0_3d.png" width="80%" alt="MNIST-28 s0 manifold"/>
   <br/>
   <em>$s_0(H, L)$ as a fitted manifold over the $H \times L$ grid (MNIST-28, WANDA).</em>
 </p>
@@ -132,9 +132,9 @@ For the theory background of the SK-with-bond-disorder model and what the parabo
 |---|---|---|---|---|
 | FC unstructured | $H \times L$ grid on 4 datasets | random / magnitude / WANDA | accuracy | `unstructured_pruning/` |
 | FC + inference-time disorder | $H \times L$ grid on 3 datasets | random + Gaussian weight noise | accuracy | `temperature_pruning/` |
-| FC structured (legacy) | $H \times L$ on sklearn / CIFAR | signal / weight / WANDA / Taylor / random | accuracy | `pruning/` |
-| Pythia transformer family | 14M–6.9B | WANDA on MLP neurons | perplexity | `pruning/Pythia_test.ipynb` |
-| Mixed open-source LLMs | TinyLlama-1.1B, Qwen2.5-0.5B, SmolLM2-1.7B | top-K activation sparsity | loss / perplexity | `pruning/LLM_pruning_test.ipynb` |
+| FC structured (legacy) | $H \times L$ on sklearn / CIFAR | signal / weight / WANDA / Taylor / random | accuracy | `unstructured_pruning/base/` |
+| Pythia transformer family | 14M–6.9B | WANDA on MLP neurons | perplexity | `docs/notebooks/Pythia_test.ipynb` |
+| Mixed open-source LLMs | TinyLlama-1.1B, Qwen2.5-0.5B, SmolLM2-1.7B | top-K activation sparsity | loss / perplexity | `docs/notebooks/LLM_pruning_test.ipynb` |
 
 ---
 
@@ -144,13 +144,13 @@ For the theory background of the SK-with-bond-disorder model and what the parabo
 unstructured_pruning/        Main results: weight-level pruning across 4 datasets
   core.py                      shared (H, L) grid runner — train, mask, fit, plot
   methods.py                   random_masks, magnitude_masks, wanda_masks
-  {sklearn,mnist28,cifar,cifar_resnet}_scaling.py
-                               thin per-dataset wrappers over core
-  loss_scaling.py              cross-entropy-based scaling diagnostics
-  param_scaling.py             critical density vs total parameter count
-  plot_3d_scaling.py           3D manifold renderer for s_0(H, L)
-  (figures now under assets/)                     per-dataset PNGs + JSON results
-  checkpoints/                 trained model checkpoints (one per (H, L, repeat))
+  base/                        shared FC library (relocated from the old pruning/)
+    pruning.py                   FCNetwork class, sigmoid_fit, path-tracing engine
+    {cifar,mnist,mnist28}_scaling.py   dataset loaders + legacy scaling helpers
+    test.py                      unit tests for the FC library
+  runners/                     thin per-dataset wrappers over core (one per dataset)
+  analysis/                    loss/param scaling diagnostics
+  plotting/                    3D manifold + beta-vs-s0 renderers
 
 temperature_pruning/         Empirical test of the SK-with-bond-disorder critical line
   noise.py                     Gaussian weight-noise temperature knob (per-layer RMS-scaled)
@@ -158,18 +158,12 @@ temperature_pruning/         Empirical test of the SK-with-bond-disorder critica
   analysis.py                  per-cell quadratic fit + data-collapse diagnostic
   plots.py                     accuracy curves, critical line, data collapse
   main.py                      argparse driver with per-dataset registry
-  (figures now under assets/)                     critical_line / accuracy_curves / data_collapse per dataset
 
-pruning/                     Legacy structured pruning + LLM notebooks
-  pruning.py                   FCNetwork class, sigmoid_fit, path-tracing engine
-  {mnist,mnist28,cifar,pythia}_scaling.py
-  Pythia_test.ipynb            transformer scaling laws across the Pythia family
-  LLM_pruning_test.ipynb       mixed-LLM susceptibility + data collapse
-  test.py                      unit tests
-
+checkpoints/                 trained model checkpoints (one dir per dataset_method, git-ignored)
 docs/paper/                  IsingPruning.tex + IsingPruning.pdf (theory writeup)
-u_scripts/                   SLURM batch scripts for ALICE HPC
-assets/                      Cross-cutting reference figures used in the paper
+docs/notebooks/              Pythia + mixed-LLM experiment notebooks
+scripts/                     local env setup + scripts/u_scripts/ SLURM batch jobs
+assets/                      generated figures + JSON results (git-ignored)
 ```
 
 ---
@@ -180,7 +174,7 @@ assets/                      Cross-cutting reference figures used in the paper
 ```bash
 python -m unstructured_pruning.runners.mnist28_scaling --method wanda
 python -m unstructured_pruning.runners.cifar_resnet_scaling --method wanda
-# outputs to assets/unstructured_pruning/unstructured_figures_<dataset>_<method>/
+# outputs to assets/unstructured_pruning/<dataset>_<method>/
 ```
 
 **Temperature/bond-disorder critical-line sweep (uses the trained checkpoints from above):**
@@ -198,8 +192,8 @@ python -m temperature_pruning.main --dataset mnist28 --analysis-only
 
 **Submit the full unstructured grid to ALICE HPC (4 datasets × 3 methods):**
 ```bash
-bash u_scripts/submit.sh
-DATASETS="sklearn mnist28" METHODS="magnitude wanda" bash u_scripts/submit.sh
+bash scripts/u_scripts/submit.sh
+DATASETS="sklearn mnist28" METHODS="magnitude wanda" bash scripts/u_scripts/submit.sh
 ```
 
 **Use as a library:**
@@ -212,7 +206,7 @@ from temperature_pruning.noise import add_weight_noise
 import numpy as np
 
 model, _ = load_fc_checkpoint(
-    'unstructured_pruning/checkpoints/unstructured_figures_mnist28_random/H192_L5_r2.pt'
+    'checkpoints/mnist28_random/H192_L5_r2.pt'
 )
 rng = np.random.default_rng(0)
 noisy = add_weight_noise(model, sigma=0.2, rng=rng)
@@ -227,7 +221,7 @@ accs, baseline = evaluate_masked_accuracy(noisy, X_test, y_test, masks)
 ```bash
 pip install numpy scipy scikit-learn matplotlib torch torchvision
 
-# Optional: LLM experiments in pruning/
+# Optional: LLM experiments in docs/notebooks/
 pip install transformers datasets accelerate
 ```
 

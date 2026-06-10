@@ -6,24 +6,25 @@ function of `s`. The recovery curve is again sigmoidal in shape, with a
 critical density `s_0` whose dependence on width `H` and depth `L` (and total
 parameter count `P`) constitutes the central object of study.
 
-It is the **unstructured / weight-level** counterpart to [`pruning/`](../pruning/),
-which prunes whole-neuron paths via top-`K` selection. The two subpackages
-share the `FCNetwork` model class and the sigmoid-fitting utilities.
+It is the **unstructured / weight-level** counterpart to the legacy structured
+(whole-neuron, top-`K`) pruning, whose shared `FCNetwork` model class and
+sigmoid-fitting utilities now live in the [`base/`](./base/) library below.
 
 ## Layout
 
 ```
 unstructured_pruning/
 ├── core.py  methods.py        shared engine + pruning methods (kept at root)
+├── base/       shared FC library (FCNetwork, sigmoid fit, dataset loaders)
 ├── runners/    per-dataset scaling drivers + method_comparison + more_combinations (CLI: python -m unstructured_pruning.runners.<name>)
 ├── analysis/   param_scaling, loss_scaling, heldout_s0_prediction(+multi)
 ├── plotting/   plot_3d_scaling(+_v2), plot_beta_vs_s0, replot_from_json
 ├── toy_examples/   analytically tractable minimal experiments
-├── extensions/     single_axis_stratified probe
-└── checkpoints/    trained weights (data, stays)
+└── extensions/     single_axis_stratified probe
 ```
 
-All generated figures/JSON now write under `assets/unstructured_pruning/`.
+All generated figures/JSON now write under `assets/unstructured_pruning/`;
+trained weights are cached under the repo-root `checkpoints/` (git-ignored).
 
 ---
 
@@ -159,7 +160,7 @@ After every `(H, L)` bundle the engine appends to `output_dir/scaling_results.js
 On a re-run, the file is loaded back and the set of finished
 `(H, L, repeat)` triples is skipped — so an interrupted job (or one that
 needs an extended grid) resumes cleanly. Trained weights for each cell are
-cached under `unstructured_pruning/checkpoints/<output_dir_name>/H{H}_L{L}_r{r}.pt`.
+cached under `checkpoints/<output_dir_name>/H{H}_L{L}_r{r}.pt`.
 
 > The `checkpoints/` directory can grow to several GB and is excluded from
 > the repository via `.gitignore`. Delete it freely if disk pressure is an issue;
@@ -180,7 +181,7 @@ Two PNGs per `(dataset, method)` cell:
 
 All four drivers are thin wrappers around `run_scaling_experiment`. They
 share `--method {random,magnitude,wanda}`, `--output-dir`, `--n-repeats` CLI
-flags and write to `assets/unstructured_pruning/unstructured_figures_<dataset>_<method>/`.
+flags and write to `assets/unstructured_pruning/<dataset>_<method>/`.
 
 | Driver                    | Dataset                          | Input dim | Default `H × L`                                         | Train epochs | Calib `X` for WANDA |
 |---------------------------|----------------------------------|-----------|---------------------------------------------------------|--------------|---------------------|
@@ -200,7 +201,7 @@ chance; this happens occasionally for very small `H` on harder datasets.
 
 ## Cross-dataset analysis: `param_scaling.py`
 
-Reads every `assets/unstructured_pruning/unstructured_figures_<dataset>_<method>/scaling_results.json`,
+Reads every `assets/unstructured_pruning/<dataset>_<method>/scaling_results.json`,
 keeps rows with `sigmoid_R² > 0.80`, and fits
 
 ```
@@ -248,21 +249,21 @@ CLI flags (common to all four dataset drivers):
 
 ### Cluster usage
 
-`u_scripts/submit.sh` submits all `dataset × method` jobs to SLURM with
+`scripts/u_scripts/submit.sh` submits all `dataset × method` jobs to SLURM with
 per-dataset walltime presets. `N_REPEATS` is propagated as both a Python
 flag and a walltime multiplier:
 
 ```bash
 N_REPEATS=3 DATASETS="cifar_pca cifar_resnet" METHODS="wanda magnitude" \
-    bash u_scripts/submit.sh
+    bash scripts/u_scripts/submit.sh
 ```
 
 ### Dependencies
 
 `numpy`, `torch`, `scipy`, `matplotlib`, `scikit-learn`, `torchvision` (for
 MNIST / CIFAR raw data and the frozen ResNet18). The package shares
-`FCNetwork`, `sigmoid_fn`, and `fit_sigmoid` with `pruning/` — that import
-is lazy to avoid circularity.
+`FCNetwork`, `sigmoid_fn`, and `fit_sigmoid` with the `base/` library — that
+import is lazy to avoid circularity.
 
 ---
 
@@ -271,7 +272,7 @@ is lazy to avoid circularity.
 ```
 assets/unstructured_pruning/
 ├── param_scaling.png                                    ← cross-dataset φ figure
-├── unstructured_figures_<dataset>_<method>/
+├── <dataset>_<method>/
 │   ├── scaling_results.json     # one row per (H, L, repeat); sigmoid params + R²
 │   ├── scaling_laws.json        # fitted bivariate exponents for s_0, β, g_eff
 │   ├── scaling_curves.png       # recovery curves + s_0 vs. H
@@ -286,10 +287,10 @@ assets/unstructured_pruning/
 
 ## Relationship to the rest of the repo
 
-- Reuses `pruning.pruning.FCNetwork`, `sigmoid_fn`, `fit_sigmoid` from the
-  sister [`pruning/`](../pruning/) subpackage.
+- Reuses `unstructured_pruning.base.pruning.FCNetwork`, `sigmoid_fn`,
+  `fit_sigmoid` from the [`base/`](./base/) library.
 - The `data` tuple expected by `run_scaling_experiment` is the same
   `(X_tr, X_val, X_te, y_tr, y_val, y_te)` produced by the loaders in
-  `pruning/{mnist,mnist28,cifar}_scaling.py`.
+  `unstructured_pruning/base/{mnist,mnist28,cifar}_scaling.py`.
 - Aggregated assets used in the top-level README live under
   `assets/legacy/<dataset>/`.

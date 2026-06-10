@@ -11,11 +11,11 @@ from scipy.optimize import curve_fit
 ROOT='/Users/chrischalkias/Projects/critiPrune'
 sys.path.insert(0, ROOT)
 os.chdir(ROOT)
-from pruning.mnist28_scaling import load_mnist28
+from unstructured_pruning.base.mnist28_scaling import load_mnist28
 
 A_RAND = 0.1
-CKDIR = 'unstructured_pruning/checkpoints/unstructured_figures_mnist28_random'
-JSON  = 'assets/unstructured_pruning/unstructured_figures_mnist28_random/scaling_results.json'
+CKDIR = 'checkpoints/mnist28_random'
+JSON  = 'assets/unstructured_pruning/mnist28_random/scaling_results.json'
 
 # ---- data (same preprocessing as training) ----
 X_tr, X_val, X_te, y_tr, y_val, y_te = load_mnist28()

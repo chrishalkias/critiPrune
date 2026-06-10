@@ -3,7 +3,6 @@
 *.pyc
 *.pyo
 /accuracies_all_methods.txt
-LLM_pruning_test.ipynb
 CLAUDE.md
 graphify-out/
 .pytest_cache
@@ -14,11 +13,9 @@ docs
 cluster_info.md
 submit_instructions.md
 slurm_logs
-unstructured_pruning/checkpoints/
-unstructured_pruning/checkpoints.zip
-unstructured_pruning/figures/figures.zip
 .ruff_cache
 **/.DS_Store
+
 # build/cache cruft
 __pycache__/
 *.bak

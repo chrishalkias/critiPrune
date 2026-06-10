@@ -4,8 +4,8 @@
 # Matrix: 4 datasets × 3 methods = 12 jobs.
 #
 # Usage:
-#   bash u_scripts/submit.sh [account]        # default account: liacs
-#   DATASETS=sklearn METHODS=random bash u_scripts/submit.sh   # subset
+#   bash scripts/u_scripts/submit.sh [account]        # default account: liacs
+#   DATASETS=sklearn METHODS=random bash scripts/u_scripts/submit.sh   # subset
 #
 # Run from the project root.
 set -euo pipefail
@@ -52,7 +52,7 @@ for DATASET in $DATASETS; do
             --mem="${MEM[$DATASET]}" \
             --export=ALL,DATASET="$DATASET",METHOD="$METHOD",N_REPEATS="$N_REPEATS" \
             --parsable \
-            u_scripts/unstructured.sbatch)
+            scripts/u_scripts/unstructured.sbatch)
         printf "  %-25s  job=%s  time=%s  mem=%s\n" \
             "$JOB_NAME" "$JOB_ID" "$SCALED_TIME" "${MEM[$DATASET]}"
     done

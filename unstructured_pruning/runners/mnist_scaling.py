@@ -17,7 +17,7 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from pruning.mnist_scaling import load_data  # noqa: E402
+from unstructured_pruning.base.mnist_scaling import load_data  # noqa: E402
 from unstructured_pruning.core import run_scaling_experiment, DEFAULT_DENSITIES  # noqa: E402
 from unstructured_pruning.methods import UNSTRUCTURED_METHODS  # noqa: E402
 
@@ -32,7 +32,7 @@ def main(method='random', output_dir=None, n_repeats=1):
         raise SystemExit(f"unknown method '{method}'. "
                          f"Choose from: {list(UNSTRUCTURED_METHODS)}")
     if output_dir is None:
-        output_dir = f'assets/unstructured_pruning/unstructured_figures_sklearn_{method}'
+        output_dir = f'assets/unstructured_pruning/sklearn_{method}'
 
     np.random.seed(SEED); torch.manual_seed(SEED)
     print("=" * 70)

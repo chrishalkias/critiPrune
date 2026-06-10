@@ -23,7 +23,7 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
 # Reuse the raw-loader fallbacks from the existing CIFAR script.
-from pruning.cifar_scaling import (  # noqa: E402
+from unstructured_pruning.base.cifar_scaling import (  # noqa: E402
     _load_cifar10_torchvision, _load_cifar10_raw,
 )
 from unstructured_pruning.core import run_scaling_experiment, DEFAULT_DENSITIES  # noqa: E402
@@ -88,7 +88,7 @@ def main(method='random', output_dir=None, n_repeats=1):
     if method not in UNSTRUCTURED_METHODS:
         raise SystemExit(f"unknown method '{method}'")
     if output_dir is None:
-        output_dir = f'assets/unstructured_pruning/unstructured_figures_cifar_pca_{method}'
+        output_dir = f'assets/unstructured_pruning/cifar_pca_{method}'
 
     np.random.seed(SEED); torch.manual_seed(SEED)
     print("=" * 70)

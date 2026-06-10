@@ -1,5 +1,5 @@
 """Public API for the FC path-tracing pruning library (re-exports from
-:mod:`pruning.pruning`)."""
+:mod:`unstructured_pruning.base.pruning`)."""
 from .pruning import (  # noqa: F401
     FCNetwork,
     accuracy,

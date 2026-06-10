@@ -12,9 +12,9 @@
 #   cifar_resnet  ~2-3h           ~9h         10:00:00
 #
 # Usage:
-#   bash u_scripts/submit_more_repeats.sh [account]                       # default: liacs
-#   DATASETS=mnist28 METHODS=random bash u_scripts/submit_more_repeats.sh # subset
-#   N_REPEATS=4 bash u_scripts/submit_more_repeats.sh                     # adjust total repeats
+#   bash scripts/u_scripts/submit_more_repeats.sh [account]                       # default: liacs
+#   DATASETS=mnist28 METHODS=random bash scripts/u_scripts/submit_more_repeats.sh # subset
+#   N_REPEATS=4 bash scripts/u_scripts/submit_more_repeats.sh                     # adjust total repeats
 #
 # Run from the project root.
 set -euo pipefail
@@ -56,7 +56,7 @@ for DATASET in $DATASETS; do
             --mem="${MEM[$DATASET]}" \
             --export=ALL,DATASET="$DATASET",METHOD="$METHOD",N_REPEATS="$N_REPEATS",EXTRA_REPEATS_ONLY=1 \
             --parsable \
-            u_scripts/more_combinations.sbatch)
+            scripts/u_scripts/more_combinations.sbatch)
         printf "  %-30s  job=%s  time=%s  mem=%s\n" \
             "$JOB_NAME" "$JOB_ID" "${TIME[$DATASET]}" "${MEM[$DATASET]}"
     done

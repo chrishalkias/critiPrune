@@ -35,10 +35,9 @@ MAPPING = {
     'falsifiability_null_control.png':     'assets/input_noise/extensions/falsifiability/null_control.png',
     'falsifiability_signed_residual.png':  'assets/input_noise/extensions/falsifiability/signed_residual_L2.png',
     'beta_vs_H_FSS.png':                   'assets/temperature_pruning/fss_check/beta_vs_H.png',
-    's0_manifold_mnist.png':               'assets/unstructured_pruning/unstructured_figures_mnist28_wanda/s0_3d_v2.png',
-    's0_manifold_digits.png':              'assets/unstructured_pruning/unstructured_figures_sklearn_wanda/s0_3d_v2.png',
-    'sigmoid_overlay_fit.png':             'assets/unstructured_pruning/sigmoid_overlay_fit.png',
-    'sigmoid_overlay_data.png':            'assets/unstructured_pruning/sigmoid_overlay_data.png',
+    's0_manifold_mnist.png':               'assets/unstructured_pruning/mnist28_wanda/s0_3d_v2.png',
+    's0_manifold_digits.png':              'assets/unstructured_pruning/sklearn_wanda/s0_3d_v2.png',
+    'sigmoid_overlay.png':                 'assets/unstructured_pruning/sigmoid_overlay.png',
 }
 
 

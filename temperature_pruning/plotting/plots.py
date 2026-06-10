@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
 
-from pruning.pruning import sigmoid_fn
+from unstructured_pruning.base.pruning import sigmoid_fn
 
 from ..analysis import (collapse_score, fit_critical_line, fit_model_comparison,
                        group_pc_by_cell)

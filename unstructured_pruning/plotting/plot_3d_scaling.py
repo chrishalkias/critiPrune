@@ -2,7 +2,7 @@
 r"""Publication-quality 3D comparison plots: empirical vs. theoretical
 $s_0(H, L)$ manifolds.
 
-For each ``assets/unstructured_pruning/unstructured_figures_<dataset>_<method>``
+For each ``assets/unstructured_pruning/<dataset>_<method>``
 directory containing both ``scaling_results.json`` and ``scaling_laws.json``,
 this script writes ``s0_3d.png`` next to the existing 2D plots.
 
@@ -283,7 +283,8 @@ def main(base='assets/unstructured_pruning'):
     print(f'  Rendering with text.usetex = {have_latex}')
 
     saved, skipped = [], []
-    for d in sorted(glob.glob(os.path.join(base, 'unstructured_figures_*'))):
+    for d in sorted(p for m in ('magnitude', 'random', 'wanda')
+                    for p in glob.glob(os.path.join(base, f'*_{m}'))):
         results_p = os.path.join(d, 'scaling_results.json')
         scaling_p = os.path.join(d, 'scaling_laws.json')
         if not os.path.isfile(results_p):
@@ -291,8 +292,7 @@ def main(base='assets/unstructured_pruning'):
         results = json.load(open(results_p))
         scaling = (json.load(open(scaling_p))
                    if os.path.isfile(scaling_p) else None)
-        token = (os.path.basename(d)
-                 .replace('unstructured_figures_', ''))
+        token = os.path.basename(d)
         out = os.path.join(d, 's0_3d.png')
         p = render_3d(results, scaling, out, dataset_method=token)
         if p:
@@ -309,6 +309,6 @@ def main(base='assets/unstructured_pruning'):
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('--base', default='assets/unstructured_pruning',
-                    help='directory containing unstructured_figures_* subdirs')
+                    help='directory containing <dataset>_<method> subdirs')
     args = ap.parse_args()
     main(base=args.base)
