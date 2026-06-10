@@ -29,8 +29,7 @@ import matplotlib.pyplot as plt
 
 warnings.filterwarnings('ignore')
 
-OUTPUT_DIR = 'mnist_figures'
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+OUTPUT_DIR = 'assets/legacy/mnist'
 
 
 # --- Import from refactored pruning module ------------------------------------
@@ -399,6 +398,7 @@ def make_scaling_plots(results, scaling_results, output_dir=None):
     """Two figures: accuracy curves + K_0 scaling (dot+line | heatmap)."""
     if output_dir is None:
         output_dir = OUTPUT_DIR
+    os.makedirs(output_dir, exist_ok=True)
     good = [r for r in results
             if r.get('sigmoid_R2') is not None and r['sigmoid_R2'] > 0.80]
     if len(good) < 3:
@@ -537,6 +537,7 @@ def make_scaling_plots(results, scaling_results, output_dir=None):
 if __name__ == '__main__':
     np.random.seed(42)
     torch.manual_seed(42)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
     t_total = time.time()
 
     print("=" * 70)

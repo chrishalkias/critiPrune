@@ -51,7 +51,7 @@ from unstructured_pruning.base import (
 # --- Configuration ------------------------------------------------------------
 
 SEED = 42
-OUTPUT_DIR = 'cifar_figures'
+OUTPUT_DIR = 'assets/legacy/cifar'
 BACKBONE          = 'resnet18'
 FEATURE_DIM       = 512   # ResNet18 avgpool output dim
 FEATURE_CACHE_DIR = os.environ.get('FEATURE_CACHE_DIR', '/tmp/cifar_features')
